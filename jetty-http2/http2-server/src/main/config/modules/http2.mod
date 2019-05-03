@@ -29,3 +29,6 @@ etc/jetty-http2.xml
 
 ## Initial session receive window (client to server)
 # jetty.http2.initialSessionRecvWindow=1048576
+
+## True to enable extended CONNECT method defined in RFC8441
+# jetty.http2.isExtendedConnectSupported=false

@@ -12,6 +12,7 @@
         <Set name="maxConcurrentStreams"><Property name="jetty.http2.maxConcurrentStreams" default="128"/></Set>
         <Set name="initialStreamRecvWindow"><Property name="jetty.http2.initialStreamRecvWindow" default="524288"/></Set>
         <Set name="initialSessionRecvWindow"><Property name="jetty.http2.initialSessionRecvWindow" default="1048576"/></Set>
+        <Set name="isExtendedConnectSupported"><Property name="jetty.http2.isExtendedConnectSupported" default="false"/></Set>
       </New>
     </Arg>
   </Call>

@@ -60,6 +60,7 @@ public abstract class AbstractHTTP2ServerConnectionFactory extends AbstractConne
     private int maxSettingsKeys = SettingsFrame.DEFAULT_MAX_KEYS;
     private FlowControlStrategy.Factory flowControlStrategyFactory = () -> new BufferingFlowControlStrategy(0.5F);
     private long streamIdleTimeout;
+    private boolean extendedConnect = false;
 
     public AbstractHTTP2ServerConnectionFactory(@Name("config") HttpConfiguration httpConfiguration)
     {
@@ -181,6 +182,17 @@ public abstract class AbstractHTTP2ServerConnectionFactory extends AbstractConne
         return httpConfiguration;
     }
 
+    @ManagedAttribute("True if extended CONNECT method is supported")
+    public boolean isExtendedConnectSupported()
+    {
+        return extendedConnect;
+    }
+
+    public void setExtendedConnectSupported(boolean extendedConnect)
+    {
+        this.extendedConnect = extendedConnect;
+    }
+
     protected Map<Integer, Integer> newSettings()
     {
         Map<Integer, Integer> settings = new HashMap<>();
@@ -190,6 +202,8 @@ public abstract class AbstractHTTP2ServerConnectionFactory extends AbstractConne
         if (maxConcurrentStreams >= 0)
             settings.put(SettingsFrame.MAX_CONCURRENT_STREAMS, maxConcurrentStreams);
         settings.put(SettingsFrame.MAX_HEADER_LIST_SIZE, getHttpConfiguration().getRequestHeaderSize());
+        if (isExtendedConnectSupported())
+            settings.put(SettingsFrame.ENABLE_CONNECT_PROTOCOL, 1);
         return settings;
     }
 
