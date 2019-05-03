@@ -41,21 +41,21 @@ import org.eclipse.jetty.websocket.core.internal.ExtensionStack;
 
 public class Negotiation
 {
-    private final Request baseRequest;
-    private final HttpServletRequest request;
-    private final HttpServletResponse response;
-    private final List<ExtensionConfig> offeredExtensions;
-    private final List<String> offeredSubprotocols;
-    private final WebSocketExtensionRegistry registry;
-    private final DecoratedObjectFactory objectFactory;
-    private final ByteBufferPool bufferPool;
-    private final String version;
-    private final Boolean upgrade;
-    private final String key;
+    protected final Request baseRequest;
+    protected final HttpServletRequest request;
+    protected final HttpServletResponse response;
+    protected final List<ExtensionConfig> offeredExtensions;
+    protected final List<String> offeredSubprotocols;
+    protected final WebSocketExtensionRegistry registry;
+    protected final DecoratedObjectFactory objectFactory;
+    protected final ByteBufferPool bufferPool;
+    protected final String version;
+    protected final Boolean upgrade;
+    protected final String key;
 
-    private List<ExtensionConfig> negotiatedExtensions;
-    private String subprotocol;
-    private ExtensionStack extensionStack;
+    protected List<ExtensionConfig> negotiatedExtensions;
+    protected String subprotocol;
+    protected ExtensionStack extensionStack;
 
     /**
      * @throws BadMessageException if there is any errors parsing the upgrade request
@@ -75,7 +75,7 @@ public class Negotiation
         this.objectFactory = objectFactory;
         this.bufferPool = bufferPool;
 
-        Boolean upgrade = null;
+        Boolean upgradeHeader = null;
         String key = null;
         String version = null;
         QuotedCSV connectionCSVs = null;
@@ -91,8 +91,8 @@ public class Negotiation
                     switch (field.getHeader())
                     {
                         case UPGRADE:
-                            if (upgrade == null && "websocket".equalsIgnoreCase(field.getValue()))
-                                upgrade = Boolean.TRUE;
+                            if (upgradeHeader == null && "websocket".equalsIgnoreCase(field.getValue()))
+                                upgradeHeader = Boolean.TRUE;
                             break;
 
                         case CONNECTION:
@@ -130,7 +130,8 @@ public class Negotiation
 
             this.version = version;
             this.key = key;
-            this.upgrade = upgrade != null && connectionCSVs != null && connectionCSVs.getValues().stream().anyMatch(s -> s.equalsIgnoreCase("Upgrade"));
+
+            this.upgrade = upgradeHeader != null && connectionCSVs != null && connectionCSVs.getValues().stream().anyMatch(s -> s.equalsIgnoreCase("Upgrade"));
 
             Set<String> available = registry.getAvailableExtensionNames();
             offeredExtensions = extensions == null
@@ -251,5 +252,4 @@ public class Negotiation
             getOfferedExtensions(),
             getOfferedSubprotocols());
     }
-
 }

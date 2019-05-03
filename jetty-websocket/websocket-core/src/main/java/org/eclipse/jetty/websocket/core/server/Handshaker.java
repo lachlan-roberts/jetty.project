@@ -18,18 +18,21 @@
 
 package org.eclipse.jetty.websocket.core.server;
 
-import org.eclipse.jetty.websocket.core.FrameHandler;
-import org.eclipse.jetty.websocket.core.server.internal.RFC6455Handshaker;
+import java.io.IOException;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
+
+import org.eclipse.jetty.websocket.core.FrameHandler;
+import org.eclipse.jetty.websocket.core.server.internal.HandshakerSelector;
+import org.eclipse.jetty.websocket.core.server.internal.RFC6455Handshaker;
+import org.eclipse.jetty.websocket.core.server.internal.RFC8441Handshaker;
 
 public interface Handshaker
 {
-    static Handshaker newInstance()
+    static Handshaker  newInstance()
     {
-        return new RFC6455Handshaker();
+        return new HandshakerSelector(new RFC6455Handshaker(), new RFC8441Handshaker());
     }
 
     boolean upgradeRequest(

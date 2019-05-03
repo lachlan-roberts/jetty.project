@@ -112,6 +112,8 @@ public abstract class ClientUpgradeRequest extends HttpRequest implements Respon
 
         this.wsClient = webSocketClient;
         this.futureCoreSession = new CompletableFuture<>();
+
+        // TODO: this is invalid for HTTP/2 requests
         method(HttpMethod.GET);
         version(HttpVersion.HTTP_1_1);
 
@@ -180,6 +182,7 @@ public abstract class ClientUpgradeRequest extends HttpRequest implements Respon
     @Override
     public void send(final Response.CompleteListener listener)
     {
+        // TODO: this adds only the HTTP/1.1 headers, (if HTTP/2 send CONNECT request)
         initWebSocketHeaders();
         super.send(listener);
     }
@@ -232,11 +235,12 @@ public abstract class ClientUpgradeRequest extends HttpRequest implements Respon
             }
         }
 
+        // TODO: this will be a 200 response for HTTP/2 success
         if (responseStatusCode != HttpStatus.SWITCHING_PROTOCOLS_101)
         {
             // Failed to upgrade (other reason)
-            handleException(
-                new UpgradeException(requestURI, responseStatusCode, "Failed to upgrade to websocket: Unexpected HTTP Response Status Code: " + responseLine));
+            handleException( new UpgradeException(requestURI, responseStatusCode,
+                    "Failed to upgrade to websocket: Unexpected HTTP Response Status Code: " + responseLine));
         }
     }
 
@@ -249,9 +253,11 @@ public abstract class ClientUpgradeRequest extends HttpRequest implements Respon
     @Override
     public void upgrade(HttpResponse response, HttpConnectionOverHTTP httpConnection)
     {
+        // TODO: http2 upgrade does not use upgrade header
         if (!this.getHeaders().get(HttpHeader.UPGRADE).equalsIgnoreCase("websocket"))
             throw new HttpResponseException("Not a WebSocket Upgrade", response);
 
+        // TODO: http2 upgrade does not use SEC_WEBSOCKET_KEY or SEC_WEBSOCKET_ACCEPT
         // Check the Accept hash
         String reqKey = this.getHeaders().get(HttpHeader.SEC_WEBSOCKET_KEY);
         String expectedHash = WebSocketCore.hashKey(reqKey);
@@ -324,7 +330,6 @@ public abstract class ClientUpgradeRequest extends HttpRequest implements Respon
         // We can upgrade
         EndPoint endp = httpConnection.getEndPoint();
         customize(endp);
-
         FrameHandler frameHandler = getFrameHandler(wsClient, response);
 
         if (frameHandler == null)
