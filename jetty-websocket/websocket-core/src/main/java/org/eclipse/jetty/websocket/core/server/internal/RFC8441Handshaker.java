@@ -19,8 +19,8 @@ import org.eclipse.jetty.server.ConnectionFactory;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.HttpChannel;
 import org.eclipse.jetty.server.HttpConfiguration;
-import org.eclipse.jetty.server.HttpConnection;
 import org.eclipse.jetty.server.HttpConnectionFactory;
+import org.eclipse.jetty.server.HttpTransport;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Response;
 import org.eclipse.jetty.util.log.Log;
@@ -192,15 +192,13 @@ public class RFC8441Handshaker implements Handshaker
         if (getSendServerVersion(connector))
             baseResponse.getHttpFields().put(SERVER_VERSION);
 
-        baseResponse.flushBuffer();
         baseRequest.setHandled(true);
 
         // upgrade
         if (LOG.isDebugEnabled())
             LOG.debug("upgrade connection={} session={}", connection, channel);
 
-        baseResponse.setStatus(HttpServletResponse.SC_SWITCHING_PROTOCOLS);
-        baseRequest.setAttribute(HttpConnection.UPGRADE_CONNECTION_ATTRIBUTE, connection);
+        baseRequest.setAttribute(HttpTransport.UPGRADE_CONNECTION_ATTRIBUTE, connection);
         return true;
     }
 

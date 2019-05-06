@@ -18,11 +18,11 @@
 
 package org.eclipse.jetty.websocket.core.internal;
 
+import java.nio.ByteBuffer;
+
 import org.eclipse.jetty.io.ByteBufferPool;
 import org.eclipse.jetty.util.BufferUtil;
 import org.eclipse.jetty.websocket.core.Frame;
-
-import java.nio.ByteBuffer;
 
 /**
  * Generating a frame in WebSocket land.
@@ -235,6 +235,36 @@ public class Generator
                 buf.put(frame.getPayload());
             }
         }
+    }
+
+    /**
+     * Generate the whole frame (header + payload copy) into a single ByteBuffer.
+     * <p>
+     * Note: This is slow, moves lots of memory around. Only use this if you must (such as in unit testing).
+     *
+     * @param frame the frame to generate
+     * @return the ByteBuffer the frame was generated to
+     */
+    public ByteBuffer generateWholeFrame(Frame frame)
+    {
+        ByteBuffer buffer = bufferPool.acquire(MAX_HEADER_LENGTH + frame.getPayloadLength(), false);
+        BufferUtil.clearToFill(buffer);
+        generateHeaderBytes(frame, buffer);
+
+        if (frame.hasPayload())
+        {
+            if (readOnly)
+            {
+                buffer.put(frame.getPayload().slice());
+            }
+            else
+            {
+                buffer.put(frame.getPayload());
+            }
+        }
+
+        BufferUtil.flipToFlush(buffer, 0);
+        return buffer;
     }
 
     public ByteBufferPool getBufferPool()

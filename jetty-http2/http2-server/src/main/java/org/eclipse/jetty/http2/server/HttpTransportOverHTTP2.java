@@ -169,7 +169,7 @@ public class HttpTransportOverHTTP2 implements HttpTransport
         }
         else
         {
-            if (hasContent || (lastContent && !isTunnel(request, response)))
+            if (hasContent || (lastContent && !isTunnel(request, metaData)))
             {
                 if (lastContent)
                 {
