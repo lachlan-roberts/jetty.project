@@ -8,15 +8,15 @@ import javax.servlet.http.HttpServletResponse;
 import org.eclipse.jetty.security.Authenticator;
 import org.eclipse.jetty.security.ConstraintMapping;
 import org.eclipse.jetty.security.ConstraintSecurityHandler;
-import org.eclipse.jetty.security.HashLoginService;
-import org.eclipse.jetty.security.UserStore;
 import org.eclipse.jetty.security.authentication.GoogleAuthenticator;
+import org.eclipse.jetty.security.google.GoogleCredentials;
+import org.eclipse.jetty.security.google.GoogleLoginService;
+import org.eclipse.jetty.security.google.GoogleUserStore;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.security.Constraint;
-import org.eclipse.jetty.util.security.Credential;
 
 public class GoogleAuthTest
 {
@@ -53,9 +53,13 @@ public class GoogleAuthTest
         ConstraintSecurityHandler securityHandler = new ConstraintSecurityHandler();
         securityHandler.addConstraintMapping(constraintMapping);
 
-        UserStore userStore = new UserStore();
-        userStore.addUser("username", Credential.getCredential("password"), new String[]{"user"});
-        HashLoginService loginService = new HashLoginService();
+        String userId = "114260987481616800581";
+        GoogleCredentials googleCredentials = new GoogleCredentials(null);
+        googleCredentials.setUserId(userId);
+
+        GoogleUserStore userStore = new GoogleUserStore();
+        userStore.addUser(userId, googleCredentials, new String[]{"user"});
+        GoogleLoginService loginService = new GoogleLoginService();
         loginService.setUserStore(userStore);
         securityHandler.setLoginService(loginService);
 

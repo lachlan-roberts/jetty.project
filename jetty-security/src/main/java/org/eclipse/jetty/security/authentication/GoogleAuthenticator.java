@@ -41,6 +41,7 @@ import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.http.MimeTypes;
 import org.eclipse.jetty.security.ServerAuthException;
 import org.eclipse.jetty.security.UserAuthentication;
+import org.eclipse.jetty.security.google.GoogleCredentials;
 import org.eclipse.jetty.server.Authentication;
 import org.eclipse.jetty.server.Authentication.User;
 import org.eclipse.jetty.server.Request;
@@ -253,9 +254,8 @@ public class GoogleAuthenticator extends LoginAuthenticator
             // Handle a request for authentication.
             if (hasAuthCode(request))
             {
-                final String authCode = request.getParameter("code");
-
-                UserIdentity user = login(null, null, request);
+                GoogleCredentials credentials = new GoogleCredentials(request.getParameter("code"));
+                UserIdentity user = login(null, credentials, request);
                 HttpSession session = request.getSession(false);
                 if (user != null)
                 {
