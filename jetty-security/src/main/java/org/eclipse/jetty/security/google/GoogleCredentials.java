@@ -17,13 +17,23 @@ public class GoogleCredentials
     private static final Logger LOG = Log.getLogger(GoogleCredentials.class);
 
     private String clientId;
-    private String userId;
     private String authCode;
     private Map<String, String> userInfo;
+
+    public GoogleCredentials(Map<String, String> userInfo)
+    {
+        this.authCode = null;
+        this.userInfo = userInfo;
+    }
 
     public GoogleCredentials(String authCode)
     {
         this.authCode = authCode;
+    }
+
+    public String getUserId()
+    {
+        return userInfo.get("sub");
     }
 
     public Map<String, String> getUserInfo()
@@ -31,26 +41,28 @@ public class GoogleCredentials
         return userInfo;
     }
 
-    public boolean redeemAuthCode(String clientId, String clientSecret, String redirectUri, String tokenEndpoint, String issuer)
+    public void update(GoogleCredentials credentials)
+    {
+        if (!userInfo.get("sub").equals(credentials.getUserInfo().get("sub")))
+            throw new IllegalStateException();
+
+        this.authCode = credentials.authCode;
+        this.clientId = credentials.clientId;
+        this.userInfo = credentials.userInfo;
+    }
+
+    public void redeemAuthCode(String clientId, String clientSecret, String redirectUri, String tokenEndpoint, String issuer) throws IOException
     {
         if (LOG.isDebugEnabled())
             LOG.debug("redeemAuthCode() {}", this);
 
         this.clientId = clientId;
-
         if (authCode != null)
         {
             try
             {
                 String jwt = getJWT(clientId, clientSecret, redirectUri, tokenEndpoint, issuer);
                 userInfo = decodeJWT(jwt);
-                userId = userInfo.get("sub");
-
-            }
-            catch (IOException e)
-            {
-                LOG.warn(e);
-                return false;
             }
             finally
             {
@@ -58,50 +70,33 @@ public class GoogleCredentials
                 authCode = null;
             }
         }
-
-        return true;
-    }
-
-    public void update(GoogleCredentials credentials)
-    {
-        userInfo = credentials.userInfo;
     }
 
     public boolean validate()
     {
-        if (LOG.isDebugEnabled())
-            LOG.debug("validate() {}", this);
+        if (authCode != null || clientId == null || userInfo == null)
+            return false;
 
-        // Check hasn't expired
+        // Check expiry
         long expiry = Long.parseLong(userInfo.get("exp"));
         long currentTimeSeconds = (long)(System.currentTimeMillis()/1000F);
         if (currentTimeSeconds > expiry)
         {
-            LOG.debug("validate() expired {}", System.currentTimeMillis(), expiry);
+            if (LOG.isDebugEnabled())
+                LOG.debug("validate() expired {}", this);
             return false;
         }
 
-        // Check audience is our clientId
+        // Check audience should be clientId
         String audience = userInfo.get("aud");
-        String clientId = "1051168419525-5nl60mkugb77p9j194mrh287p1e0ahfi.apps.googleusercontent.com";
         if (!clientId.equals(audience))
         {
-            LOG.debug("validate() wrong audience {}", false);
+            if (LOG.isDebugEnabled())
+                LOG.debug("validate() audience was not clientId {}", this);
             return false;
         }
 
-        LOG.debug("validate() is {}", true);
         return true;
-    }
-
-    public void setUserId(String userId)
-    {
-        this.userId = userId;
-    }
-
-    public String getUserId()
-    {
-        return userId;
     }
 
     private Map<String, String> decodeJWT(String jwt) throws IOException

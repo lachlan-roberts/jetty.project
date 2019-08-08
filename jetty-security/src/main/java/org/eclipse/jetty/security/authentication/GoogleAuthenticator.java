@@ -57,7 +57,7 @@ import org.eclipse.jetty.util.security.Constraint;
  * FORM Authenticator.
  *
  * <p>This authenticator implements form authentication will use dispatchers to
- * the login page if the {@link #__GOOGLE_DISPATCH} init parameter is set to true.
+ * the login page if the {@link #__DISPATCH} init parameter is set to true.
  * Otherwise it will redirect.</p>
  *
  * <p>The form authenticator redirects unauthenticated requests to a log page
@@ -69,37 +69,32 @@ import org.eclipse.jetty.util.security.Constraint;
 public class GoogleAuthenticator extends LoginAuthenticator
 {
     private static final Logger LOG = Log.getLogger(FormAuthenticator.class);
+    private static final String AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 
-    public static final String __GOOGLE_SUCCESS_PAGE = "org.eclipse.jetty.security.google_success_page";
-    public static final String __GOOGLE_ERROR_PAGE = "org.eclipse.jetty.security.google_error_page";
-    public static final String __GOOGLE_DISPATCH = "org.eclipse.jetty.security.dispatch";
+    public static final String __USER_INFO = "org.eclipse.jetty.security.user_info";
+    public static final String __CLIENT_ID = "org.eclipse.jetty.security.client_id";
+    public static final String __REDIRECT_URI = "org.eclipse.jetty.security.redirect_uri";
+    public static final String __ERROR_PAGE = "org.eclipse.jetty.security.error_page";
+    public static final String __DISPATCH = "org.eclipse.jetty.security.dispatch";
     public static final String __J_URI = "org.eclipse.jetty.security.form_URI";
     public static final String __J_POST = "org.eclipse.jetty.security.form_POST";
     public static final String __J_METHOD = "org.eclipse.jetty.security.form_METHOD";
+    public static final String __CSRF_TOKEN = "org.eclipse.jetty.security.csrf_token";
 
-    private static final String CSRF_TOKEN_ATTRIBUTE = "CSRF_TOKEN_ATTRIBUTE";
-    private static final String issuer = "https://accounts.google.com";
-    private static final String authorization_endpoint = "https://accounts.google.com/o/oauth2/v2/auth";
-    private static final String token_endpoint = "https://oauth2.googleapis.com/token";
-
-    private String _formErrorPage;
+    private String clientId;
+    private String redirectUri;
+    private String _errorPage;
     private String _formErrorPath;
     private boolean _dispatch;
     private boolean _alwaysSaveUri;
-
-    private String clientId;
-    private String clientSecret;
-    private String redirectUri;
 
     public GoogleAuthenticator()
     {
     }
 
-    public GoogleAuthenticator(String clientId, String clientSecret, String redirectUri, String errorPage, boolean dispatch)
+    public GoogleAuthenticator(String clientId, String redirectUri, String errorPage, boolean dispatch)
     {
-        this();
         this.clientId = clientId;
-        this.clientSecret = clientSecret;
         this.redirectUri = redirectUri;
 
         if (errorPage != null)
@@ -114,14 +109,28 @@ public class GoogleAuthenticator extends LoginAuthenticator
     public void setConfiguration(AuthConfiguration configuration)
     {
         super.setConfiguration(configuration);
-        String success = configuration.getInitParameter(__GOOGLE_SUCCESS_PAGE);
+
+        String success = configuration.getInitParameter(__REDIRECT_URI);
         if (success != null)
             this.redirectUri = success;
-        String error = configuration.getInitParameter(__GOOGLE_ERROR_PAGE);
+
+        String error = configuration.getInitParameter(__ERROR_PAGE);
         if (error != null)
             setErrorPage(error);
-        String dispatch = configuration.getInitParameter(__GOOGLE_DISPATCH);
-        _dispatch = dispatch == null ? _dispatch : Boolean.parseBoolean(dispatch);
+
+        String dispatch = configuration.getInitParameter(__DISPATCH);
+        if (dispatch != null)
+            this._dispatch = Boolean.parseBoolean(dispatch);
+
+        String clientId = configuration.getInitParameter(__CLIENT_ID);
+        if (clientId != null)
+            this.clientId = clientId;
+    }
+
+    @Override
+    public String getAuthMethod()
+    {
+        return Constraint.__GOOGLE_AUTH;
     }
 
     /**
@@ -142,18 +151,12 @@ public class GoogleAuthenticator extends LoginAuthenticator
         return _alwaysSaveUri;
     }
 
-    @Override
-    public String getAuthMethod()
-    {
-        return Constraint.__GOOGLE_AUTH;
-    }
-
     private void setErrorPage(String path)
     {
         if (path == null || path.trim().length() == 0)
         {
             _formErrorPath = null;
-            _formErrorPage = null;
+            _errorPage = null;
         }
         else
         {
@@ -162,7 +165,7 @@ public class GoogleAuthenticator extends LoginAuthenticator
                 LOG.warn("form-error-page must start with /");
                 path = "/" + path;
             }
-            _formErrorPage = path;
+            _errorPage = path;
             _formErrorPath = path;
 
             if (_formErrorPath.indexOf('?') > 0)
@@ -179,6 +182,7 @@ public class GoogleAuthenticator extends LoginAuthenticator
             HttpSession session = ((HttpServletRequest)request).getSession();
             Authentication cached = new SessionAuthentication(getAuthMethod(), user, credentials);
             session.setAttribute(SessionAuthentication.__J_AUTHENTICATED, cached);
+            session.setAttribute(__USER_INFO, ((GoogleCredentials)credentials).getUserInfo());
         }
         return user;
     }
@@ -195,6 +199,7 @@ public class GoogleAuthenticator extends LoginAuthenticator
 
         //clean up session
         session.removeAttribute(SessionAuthentication.__J_AUTHENTICATED);
+        session.removeAttribute(__USER_INFO);
     }
 
     @Override
@@ -254,6 +259,17 @@ public class GoogleAuthenticator extends LoginAuthenticator
             // Handle a request for authentication.
             if (hasAuthCode(request))
             {
+                // Verify anti-forgery state token
+                String antiForgeryToken = (String)request.getSession().getAttribute(__CSRF_TOKEN);
+                if (antiForgeryToken == null || !antiForgeryToken.equals(request.getParameter("state")))
+                {
+                    LOG.warn("auth failed 403: invalid state parameter");
+                    if (response != null)
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                    return Authentication.SEND_FAILURE;
+                }
+
+                // Attempt to login with the provided authCode
                 GoogleCredentials credentials = new GoogleCredentials(request.getParameter("code"));
                 UserIdentity user = login(null, credentials, request);
                 HttpSession session = request.getSession(false);
@@ -261,7 +277,6 @@ public class GoogleAuthenticator extends LoginAuthenticator
                 {
                     // Redirect to original request
                     String nuri;
-                    GoogleAuthentication formAuth;
                     synchronized (session)
                     {
                         nuri = (String)session.getAttribute(__J_URI);
@@ -272,20 +287,20 @@ public class GoogleAuthenticator extends LoginAuthenticator
                             if (nuri.length() == 0)
                                 nuri = URIUtil.SLASH;
                         }
-                        formAuth = new GoogleAuthentication(getAuthMethod(), user);
                     }
-                    LOG.debug("authenticated {}->{}", formAuth, nuri);
+                    GoogleAuthentication googleAuth = new GoogleAuthentication(getAuthMethod(), user);
+                    LOG.debug("authenticated {}->{}", googleAuth, nuri);
 
                     response.setContentLength(0);
                     int redirectCode = (baseRequest.getHttpVersion().getVersion() < HttpVersion.HTTP_1_1.getVersion() ? HttpServletResponse.SC_MOVED_TEMPORARILY : HttpServletResponse.SC_SEE_OTHER);
                     baseResponse.sendRedirect(redirectCode, response.encodeRedirectURL(nuri));
-                    return formAuth;
+                    return googleAuth;
                 }
 
                 // not authenticated
                 if (LOG.isDebugEnabled())
                     LOG.debug("Google authentication FAILED");
-                if (_formErrorPage == null)
+                if (_errorPage == null)
                 {
                     if (LOG.isDebugEnabled())
                         LOG.debug("auth failed 403");
@@ -295,8 +310,8 @@ public class GoogleAuthenticator extends LoginAuthenticator
                 else if (_dispatch)
                 {
                     if (LOG.isDebugEnabled())
-                        LOG.debug("auth failed dispatch {}", _formErrorPage);
-                    RequestDispatcher dispatcher = request.getRequestDispatcher(_formErrorPage);
+                        LOG.debug("auth failed dispatch {}", _errorPage);
+                    RequestDispatcher dispatcher = request.getRequestDispatcher(_errorPage);
                     response.setHeader(HttpHeader.CACHE_CONTROL.asString(), HttpHeaderValue.NO_CACHE.asString());
                     response.setDateHeader(HttpHeader.EXPIRES.asString(), 1);
                     dispatcher.forward(new FormRequest(request), new FormResponse(response));
@@ -304,9 +319,9 @@ public class GoogleAuthenticator extends LoginAuthenticator
                 else
                 {
                     if (LOG.isDebugEnabled())
-                        LOG.debug("auth failed {}", _formErrorPage);
+                        LOG.debug("auth failed {}", _errorPage);
                     int redirectCode = (baseRequest.getHttpVersion().getVersion() < HttpVersion.HTTP_1_1.getVersion() ? HttpServletResponse.SC_MOVED_TEMPORARILY : HttpServletResponse.SC_SEE_OTHER);
-                    baseResponse.sendRedirect(redirectCode, response.encodeRedirectURL(URIUtil.addPaths(request.getContextPath(), _formErrorPage)));
+                    baseResponse.sendRedirect(redirectCode, response.encodeRedirectURL(URIUtil.addPaths(request.getContextPath(), _errorPage)));
                 }
 
                 return Authentication.SEND_FAILURE;
@@ -426,24 +441,25 @@ public class GoogleAuthenticator extends LoginAuthenticator
     public String getChallengeUri(HttpSession session)
     {
         String antiForgeryToken;
+        // TODO: is this synchronization necessary
         synchronized (session)
         {
-            antiForgeryToken = (session.getAttribute(CSRF_TOKEN_ATTRIBUTE) == null)
+            antiForgeryToken = (session.getAttribute(__CSRF_TOKEN) == null)
                 ? new BigInteger(130, new SecureRandom()).toString(32)
-                : (String)session.getAttribute(CSRF_TOKEN_ATTRIBUTE);
-            session.setAttribute(CSRF_TOKEN_ATTRIBUTE, antiForgeryToken);
+                : (String)session.getAttribute(__CSRF_TOKEN);
+            session.setAttribute(__CSRF_TOKEN, antiForgeryToken);
         }
 
-        return authorization_endpoint +
+        return AUTH_ENDPOINT +
             "?client_id=" + clientId +
             "&redirect_uri=" + redirectUri +
-            "&scope=openid%20email" +
+            "&scope=openid%20email%20profile" +
             "&state=" + antiForgeryToken +
             "&response_type=code";
     }
 
     @Override
-    public boolean secureResponse(ServletRequest req, ServletResponse res, boolean mandatory, User validatedUser) throws ServerAuthException
+    public boolean secureResponse(ServletRequest req, ServletResponse res, boolean mandatory, User validatedUser)
     {
         return true;
     }

@@ -19,6 +19,7 @@
 package org.eclipse.jetty.security.google;
 
 import java.security.Principal;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.security.auth.Subject;
@@ -29,18 +30,22 @@ import org.eclipse.jetty.security.IdentityService;
 import org.eclipse.jetty.server.UserIdentity;
 import org.eclipse.jetty.util.component.AbstractLifeCycle;
 
-/**
- * Base class to store User
- */
 public class GoogleUserStore extends AbstractLifeCycle
 {
-
     private IdentityService _identityService = new DefaultIdentityService();
     private final Map<String, UserIdentity> _knownUserIdentities = new ConcurrentHashMap<>();
 
-    public void addUser(String username, GoogleCredentials credentials, String[] roles)
+    public void addUser(String userId, String[] roles)
     {
-        Principal userPrincipal = new GoogleLoginService.GoogleUserPrincipal(username, credentials);
+        Map<String, String> userInfo = new HashMap<>();
+        userInfo.put("sub", userId);
+        GoogleCredentials googleCredentials = new GoogleCredentials(userInfo);
+        addUser(googleCredentials, roles);
+    }
+
+    public void addUser(GoogleCredentials credentials, String[] roles)
+    {
+        Principal userPrincipal = new GoogleUserPrincipal(credentials);
         Subject subject = new Subject();
         subject.getPrincipals().add(userPrincipal);
         subject.getPrivateCredentials().add(credentials);
@@ -54,17 +59,17 @@ public class GoogleUserStore extends AbstractLifeCycle
         }
 
         subject.setReadOnly();
-        _knownUserIdentities.put(username, _identityService.newUserIdentity(subject, userPrincipal, roles));
+        _knownUserIdentities.put(credentials.getUserId(), _identityService.newUserIdentity(subject, userPrincipal, roles));
     }
 
-    public void removeUser(String username)
+    public void removeUser(String userId)
     {
-        _knownUserIdentities.remove(username);
+        _knownUserIdentities.remove(userId);
     }
 
-    public UserIdentity getUserIdentity(String userName)
+    public UserIdentity getUserIdentity(String userId)
     {
-        return _knownUserIdentities.get(userName);
+        return _knownUserIdentities.get(userId);
     }
 
     public IdentityService getIdentityService()
