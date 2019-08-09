@@ -21,21 +21,12 @@ package org.eclipse.jetty.security.authentication;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.SecureRandom;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.Locale;
-import javax.servlet.RequestDispatcher;
-import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpServletResponseWrapper;
 import javax.servlet.http.HttpSession;
 
-import org.eclipse.jetty.http.HttpHeader;
-import org.eclipse.jetty.http.HttpHeaderValue;
 import org.eclipse.jetty.http.HttpMethod;
 import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.http.MimeTypes;
@@ -54,57 +45,49 @@ import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.util.security.Constraint;
 
 /**
- * FORM Authenticator.
+ * Google Authenticator.
  *
- * <p>This authenticator implements form authentication will use dispatchers to
- * the login page if the {@link #__DISPATCH} init parameter is set to true.
- * Otherwise it will redirect.</p>
+ * <p>This authenticator implements Google authentication using OpenId Connect on top of OAuth 2.0.
  *
- * <p>The form authenticator redirects unauthenticated requests to a log page
- * which should use a form to gather username/password from the user and send them
- * to the /j_security_check URI within the context.  GoogleAuthentication uses
- * {@link SessionAuthentication} to wrap Authentication results so that they
+ * <p>The google authenticator redirects unauthenticated requests to the google identity providers authorization endpoint
+ * which will eventually redirect back to the {@link #_redirectUri} with an authCode which will be exchanged with
+ * the google token_endpoint for an id_token. The request is then restored back to the original uri requested.
+ * GoogleAuthentication uses {@link SessionAuthentication} to wrap Authentication results so that they
  * are  associated with the session.</p>
  */
 public class GoogleAuthenticator extends LoginAuthenticator
 {
-    private static final Logger LOG = Log.getLogger(FormAuthenticator.class);
+    private static final Logger LOG = Log.getLogger(GoogleAuthenticator.class);
     private static final String AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 
     public static final String __USER_INFO = "org.eclipse.jetty.security.user_info";
     public static final String __CLIENT_ID = "org.eclipse.jetty.security.client_id";
     public static final String __REDIRECT_URI = "org.eclipse.jetty.security.redirect_uri";
     public static final String __ERROR_PAGE = "org.eclipse.jetty.security.error_page";
-    public static final String __DISPATCH = "org.eclipse.jetty.security.dispatch";
-    public static final String __J_URI = "org.eclipse.jetty.security.form_URI";
-    public static final String __J_POST = "org.eclipse.jetty.security.form_POST";
-    public static final String __J_METHOD = "org.eclipse.jetty.security.form_METHOD";
+    public static final String __J_URI = "org.eclipse.jetty.security.google_URI";
+    public static final String __J_POST = "org.eclipse.jetty.security.google_POST";
+    public static final String __J_METHOD = "org.eclipse.jetty.security.google_METHOD";
     public static final String __CSRF_TOKEN = "org.eclipse.jetty.security.csrf_token";
 
-    private String clientId;
-    private String redirectUri;
+    private String _clientId;
+    private String _redirectUri;
     private String _errorPage;
-    private String _formErrorPath;
-    private boolean _dispatch;
+    private String _errorPath;
     private boolean _alwaysSaveUri;
 
     public GoogleAuthenticator()
     {
     }
 
-    public GoogleAuthenticator(String clientId, String redirectUri, String errorPage, boolean dispatch)
+    public GoogleAuthenticator(String clientId, String redirectUri, String errorPage)
     {
-        this.clientId = clientId;
-        this.redirectUri = redirectUri;
+        this._clientId = clientId;
+        this._redirectUri = redirectUri;
 
         if (errorPage != null)
             setErrorPage(errorPage);
-        _dispatch = dispatch;
     }
 
-    /**
-     * @see org.eclipse.jetty.security.authentication.LoginAuthenticator#setConfiguration(org.eclipse.jetty.security.Authenticator.AuthConfiguration)
-     */
     @Override
     public void setConfiguration(AuthConfiguration configuration)
     {
@@ -112,19 +95,15 @@ public class GoogleAuthenticator extends LoginAuthenticator
 
         String success = configuration.getInitParameter(__REDIRECT_URI);
         if (success != null)
-            this.redirectUri = success;
+            this._redirectUri = success;
 
         String error = configuration.getInitParameter(__ERROR_PAGE);
         if (error != null)
             setErrorPage(error);
 
-        String dispatch = configuration.getInitParameter(__DISPATCH);
-        if (dispatch != null)
-            this._dispatch = Boolean.parseBoolean(dispatch);
-
         String clientId = configuration.getInitParameter(__CLIENT_ID);
         if (clientId != null)
-            this.clientId = clientId;
+            this._clientId = clientId;
     }
 
     @Override
@@ -155,21 +134,21 @@ public class GoogleAuthenticator extends LoginAuthenticator
     {
         if (path == null || path.trim().length() == 0)
         {
-            _formErrorPath = null;
+            _errorPath = null;
             _errorPage = null;
         }
         else
         {
             if (!path.startsWith("/"))
             {
-                LOG.warn("form-error-page must start with /");
+                LOG.warn("error-page must start with /");
                 path = "/" + path;
             }
             _errorPage = path;
-            _formErrorPath = path;
+            _errorPath = path;
 
-            if (_formErrorPath.indexOf('?') > 0)
-                _formErrorPath = _formErrorPath.substring(0, _formErrorPath.indexOf('?'));
+            if (_errorPath.indexOf('?') > 0)
+                _errorPath = _errorPath.substring(0, _errorPath.indexOf('?'));
         }
     }
 
@@ -307,15 +286,6 @@ public class GoogleAuthenticator extends LoginAuthenticator
                     if (response != null)
                         response.sendError(HttpServletResponse.SC_FORBIDDEN);
                 }
-                else if (_dispatch)
-                {
-                    if (LOG.isDebugEnabled())
-                        LOG.debug("auth failed dispatch {}", _errorPage);
-                    RequestDispatcher dispatcher = request.getRequestDispatcher(_errorPage);
-                    response.setHeader(HttpHeader.CACHE_CONTROL.asString(), HttpHeaderValue.NO_CACHE.asString());
-                    response.setDateHeader(HttpHeader.EXPIRES.asString(), 1);
-                    dispatcher.forward(new FormRequest(request), new FormResponse(response));
-                }
                 else
                 {
                     if (LOG.isDebugEnabled())
@@ -385,7 +355,7 @@ public class GoogleAuthenticator extends LoginAuthenticator
             session = (session != null ? session : request.getSession(true));
             synchronized (session)
             {
-                // But only if it is not set already, or we save every uri that leads to a login form redirect
+                // But only if it is not set already, or we save every uri that leads to a login redirect
                 if (session.getAttribute(__J_URI) == null || _alwaysSaveUri)
                 {
                     StringBuffer buf = request.getRequestURL();
@@ -405,24 +375,13 @@ public class GoogleAuthenticator extends LoginAuthenticator
 
             // send the the challenge
             String challengeUri = getChallengeUri(session);
-            System.err.println(challengeUri);
-            if (_dispatch)
-            {
-                LOG.debug("challenge {}=={}", session.getId(), challengeUri);
-                RequestDispatcher dispatcher = request.getRequestDispatcher(challengeUri);
-                response.setHeader(HttpHeader.CACHE_CONTROL.asString(), HttpHeaderValue.NO_CACHE.asString());
-                response.setDateHeader(HttpHeader.EXPIRES.asString(), 1);
-                dispatcher.forward(new FormRequest(request), new FormResponse(response));
-            }
-            else
-            {
-                LOG.debug("challenge {}->{}", session.getId(), challengeUri);
-                int redirectCode = (baseRequest.getHttpVersion().getVersion() < HttpVersion.HTTP_1_1.getVersion() ? HttpServletResponse.SC_MOVED_TEMPORARILY : HttpServletResponse.SC_SEE_OTHER);
-                baseResponse.sendRedirect(redirectCode, response.encodeRedirectURL(challengeUri));
-            }
+            LOG.debug("challenge {}->{}", session.getId(), challengeUri);
+            int redirectCode = (baseRequest.getHttpVersion().getVersion() < HttpVersion.HTTP_1_1.getVersion() ? HttpServletResponse.SC_MOVED_TEMPORARILY : HttpServletResponse.SC_SEE_OTHER);
+            baseResponse.sendRedirect(redirectCode, response.encodeRedirectURL(challengeUri));
+
             return Authentication.SEND_CONTINUE;
         }
-        catch (IOException | ServletException e)
+        catch (IOException e)
         {
             throw new ServerAuthException(e);
         }
@@ -435,7 +394,7 @@ public class GoogleAuthenticator extends LoginAuthenticator
 
     public boolean isErrorPage(String pathInContext)
     {
-        return pathInContext != null && (pathInContext.equals(_formErrorPath));
+        return pathInContext != null && (pathInContext.equals(_errorPath));
     }
 
     public String getChallengeUri(HttpSession session)
@@ -451,8 +410,8 @@ public class GoogleAuthenticator extends LoginAuthenticator
         }
 
         return AUTH_ENDPOINT +
-            "?client_id=" + clientId +
-            "&redirect_uri=" + redirectUri +
+            "?client_id=" + _clientId +
+            "&redirect_uri=" + _redirectUri +
             "&scope=openid%20email%20profile" +
             "&state=" + antiForgeryToken +
             "&response_type=code";
@@ -464,94 +423,8 @@ public class GoogleAuthenticator extends LoginAuthenticator
         return true;
     }
 
-    protected static class FormRequest extends HttpServletRequestWrapper
-    {
-        public FormRequest(HttpServletRequest request)
-        {
-            super(request);
-        }
-
-        @Override
-        public long getDateHeader(String name)
-        {
-            if (name.toLowerCase(Locale.ENGLISH).startsWith("if-"))
-                return -1;
-            return super.getDateHeader(name);
-        }
-
-        @Override
-        public String getHeader(String name)
-        {
-            if (name.toLowerCase(Locale.ENGLISH).startsWith("if-"))
-                return null;
-            return super.getHeader(name);
-        }
-
-        @Override
-        public Enumeration<String> getHeaderNames()
-        {
-            return Collections.enumeration(Collections.list(super.getHeaderNames()));
-        }
-
-        @Override
-        public Enumeration<String> getHeaders(String name)
-        {
-            if (name.toLowerCase(Locale.ENGLISH).startsWith("if-"))
-                return Collections.<String>enumeration(Collections.<String>emptyList());
-            return super.getHeaders(name);
-        }
-    }
-
-    protected static class FormResponse extends HttpServletResponseWrapper
-    {
-        public FormResponse(HttpServletResponse response)
-        {
-            super(response);
-        }
-
-        @Override
-        public void addDateHeader(String name, long date)
-        {
-            if (notIgnored(name))
-                super.addDateHeader(name, date);
-        }
-
-        @Override
-        public void addHeader(String name, String value)
-        {
-            if (notIgnored(name))
-                super.addHeader(name, value);
-        }
-
-        @Override
-        public void setDateHeader(String name, long date)
-        {
-            if (notIgnored(name))
-                super.setDateHeader(name, date);
-        }
-
-        @Override
-        public void setHeader(String name, String value)
-        {
-            if (notIgnored(name))
-                super.setHeader(name, value);
-        }
-
-        private boolean notIgnored(String name)
-        {
-            if (HttpHeader.CACHE_CONTROL.is(name) ||
-                HttpHeader.PRAGMA.is(name) ||
-                HttpHeader.ETAG.is(name) ||
-                HttpHeader.EXPIRES.is(name) ||
-                HttpHeader.LAST_MODIFIED.is(name) ||
-                HttpHeader.AGE.is(name))
-                return false;
-            return true;
-        }
-    }
-
     /**
-     * This Authentication represents a just completed Form authentication.
+     * This Authentication represents a just completed Google authentication.
      * Subsequent requests from the same user are authenticated by the presents
      * of a {@link SessionAuthentication} instance in their session.
      */

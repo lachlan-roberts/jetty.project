@@ -48,7 +48,12 @@ public class GoogleCredentials
 
         this.authCode = credentials.authCode;
         this.clientId = credentials.clientId;
-        this.userInfo = credentials.userInfo;
+
+        // Update the old userInfo
+        for (String key : credentials.userInfo.keySet())
+        {
+            userInfo.put(key, credentials.userInfo.get(key));
+        }
     }
 
     public void redeemAuthCode(String clientId, String clientSecret, String redirectUri, String tokenEndpoint, String issuer) throws IOException

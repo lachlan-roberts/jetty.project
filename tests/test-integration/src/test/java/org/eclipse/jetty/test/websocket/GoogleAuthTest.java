@@ -24,7 +24,6 @@ public class GoogleAuthTest
 {
     private static final Logger LOG = Log.getLogger(GoogleAuthTest.class);
 
-
     public static class ProfilePage extends HttpServlet
     {
         @Override
@@ -41,7 +40,8 @@ public class GoogleAuthTest
                 "  <p>UserId: " + userInfo.get("sub") +"</p>\n" +
                 "</div>");
 
-            response.getWriter().println("<a href=\"/\">Home</a>");
+            response.getWriter().println("<a href=\"/\">Home</a><br>");
+            response.getWriter().println("<a href=\"/logout\">Logout</a><br>");
         }
     }
 
@@ -50,8 +50,17 @@ public class GoogleAuthTest
         @Override
         protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException
         {
-            LOG.warn("login authenticated redirecting to home");
             response.getWriter().println("<p>you logged in  <a href=\"/\">Home</a></p>");
+        }
+    }
+
+    public static class LogoutPage extends HttpServlet
+    {
+        @Override
+        protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException
+        {
+            request.getSession().invalidate();
+            response.sendRedirect("/");
         }
     }
 
@@ -68,8 +77,8 @@ public class GoogleAuthTest
             {
                 Map<String, String> userInfo = (Map)request.getSession().getAttribute(GoogleAuthenticator.__USER_INFO);
                 response.getWriter().println("<p>Welcome: " + userInfo.get("name") + "</p>");
-                response.getWriter().println("<p>View Profile  <a href=\"/profile\">Profile</a></p>");
-
+                response.getWriter().println("<a href=\"/profile\">Profile</a><br>");
+                response.getWriter().println("<a href=\"/logout\">Logout</a><br>");
             }
             else
             {
@@ -96,6 +105,7 @@ public class GoogleAuthTest
 
         context.addServlet(ProfilePage.class, "/profile");
         context.addServlet(LoginPage.class, "/login");
+        context.addServlet(LogoutPage.class, "/logout");
         context.addServlet(HomePage.class, "/*");
         context.addServlet(ErrorPage.class, "/error");
 
@@ -127,7 +137,7 @@ public class GoogleAuthTest
         loginService.setUserStore(userStore);
         securityHandler.setLoginService(loginService);
 
-        Authenticator authenticator = new GoogleAuthenticator(clientId, redirectUri, "/error", false);
+        Authenticator authenticator = new GoogleAuthenticator(clientId, redirectUri, "/error");
         securityHandler.setAuthenticator(authenticator);
 
         context.setSecurityHandler(securityHandler);
