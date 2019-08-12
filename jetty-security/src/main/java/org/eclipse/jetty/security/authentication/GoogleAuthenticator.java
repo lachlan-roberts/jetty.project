@@ -64,6 +64,7 @@ public class GoogleAuthenticator extends LoginAuthenticator
     public static final String __CLIENT_ID = "org.eclipse.jetty.security.client_id";
     public static final String __REDIRECT_URI = "org.eclipse.jetty.security.redirect_uri";
     public static final String __ERROR_PAGE = "org.eclipse.jetty.security.error_page";
+    public static final String __J_SECURITY_CHECK = "/j_security_check";
     public static final String __J_URI = "org.eclipse.jetty.security.google_URI";
     public static final String __J_POST = "org.eclipse.jetty.security.google_POST";
     public static final String __J_METHOD = "org.eclipse.jetty.security.google_METHOD";
@@ -226,7 +227,11 @@ public class GoogleAuthenticator extends LoginAuthenticator
         final Request baseRequest = Request.getBaseRequest(request);
         final Response baseResponse = baseRequest.getResponse();
 
-        mandatory |= hasAuthCode(request);
+        String uri = request.getRequestURI();
+        if (uri == null)
+            uri = URIUtil.SLASH;
+
+        mandatory |= isJSecurityCheck(uri);
         if (!mandatory)
             return new DeferredAuthentication(this);
 
@@ -236,44 +241,49 @@ public class GoogleAuthenticator extends LoginAuthenticator
         try
         {
             // Handle a request for authentication.
-            if (hasAuthCode(request))
+            if (isJSecurityCheck(uri))
             {
-                // Verify anti-forgery state token
-                String antiForgeryToken = (String)request.getSession().getAttribute(__CSRF_TOKEN);
-                if (antiForgeryToken == null || !antiForgeryToken.equals(request.getParameter("state")))
+                String authCode = request.getParameter("code");
+                if (authCode != null)
                 {
-                    LOG.warn("auth failed 403: invalid state parameter");
-                    if (response != null)
-                        response.sendError(HttpServletResponse.SC_FORBIDDEN);
-                    return Authentication.SEND_FAILURE;
-                }
-
-                // Attempt to login with the provided authCode
-                GoogleCredentials credentials = new GoogleCredentials(request.getParameter("code"));
-                UserIdentity user = login(null, credentials, request);
-                HttpSession session = request.getSession(false);
-                if (user != null)
-                {
-                    // Redirect to original request
-                    String nuri;
-                    synchronized (session)
+                    // Verify anti-forgery state token
+                    String state = request.getParameter("state");
+                    String antiForgeryToken = (String)request.getSession().getAttribute(__CSRF_TOKEN);
+                    if (antiForgeryToken == null || !antiForgeryToken.equals(state))
                     {
-                        nuri = (String)session.getAttribute(__J_URI);
-
-                        if (nuri == null || nuri.length() == 0)
-                        {
-                            nuri = request.getContextPath();
-                            if (nuri.length() == 0)
-                                nuri = URIUtil.SLASH;
-                        }
+                        LOG.warn("auth failed 403: invalid state parameter");
+                        if (response != null)
+                            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                        return Authentication.SEND_FAILURE;
                     }
-                    GoogleAuthentication googleAuth = new GoogleAuthentication(getAuthMethod(), user);
-                    LOG.debug("authenticated {}->{}", googleAuth, nuri);
 
-                    response.setContentLength(0);
-                    int redirectCode = (baseRequest.getHttpVersion().getVersion() < HttpVersion.HTTP_1_1.getVersion() ? HttpServletResponse.SC_MOVED_TEMPORARILY : HttpServletResponse.SC_SEE_OTHER);
-                    baseResponse.sendRedirect(redirectCode, response.encodeRedirectURL(nuri));
-                    return googleAuth;
+                    // Attempt to login with the provided authCode
+                    GoogleCredentials credentials = new GoogleCredentials(authCode);
+                    UserIdentity user = login(null, credentials, request);
+                    HttpSession session = request.getSession(false);
+                    if (user != null)
+                    {
+                        // Redirect to original request
+                        String nuri;
+                        synchronized (session)
+                        {
+                            nuri = (String)session.getAttribute(__J_URI);
+
+                            if (nuri == null || nuri.length() == 0)
+                            {
+                                nuri = request.getContextPath();
+                                if (nuri.length() == 0)
+                                    nuri = URIUtil.SLASH;
+                            }
+                        }
+                        GoogleAuthentication googleAuth = new GoogleAuthentication(getAuthMethod(), user);
+                        LOG.debug("authenticated {}->{}", googleAuth, nuri);
+
+                        response.setContentLength(0);
+                        int redirectCode = (baseRequest.getHttpVersion().getVersion() < HttpVersion.HTTP_1_1.getVersion() ? HttpServletResponse.SC_MOVED_TEMPORARILY : HttpServletResponse.SC_SEE_OTHER);
+                        baseResponse.sendRedirect(redirectCode, response.encodeRedirectURL(nuri));
+                        return googleAuth;
+                    }
                 }
 
                 // not authenticated
@@ -387,9 +397,17 @@ public class GoogleAuthenticator extends LoginAuthenticator
         }
     }
 
-    public boolean hasAuthCode(HttpServletRequest request)
+    public boolean isJSecurityCheck(String uri)
     {
-        return request.getParameter("code") != null;
+        int jsc = uri.indexOf(__J_SECURITY_CHECK);
+
+        if (jsc < 0)
+            return false;
+        int e = jsc + __J_SECURITY_CHECK.length();
+        if (e == uri.length())
+            return true;
+        char c = uri.charAt(e);
+        return c == ';' || c == '#' || c == '/' || c == '?';
     }
 
     public boolean isErrorPage(String pathInContext)

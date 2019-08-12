@@ -40,7 +40,7 @@ public class GoogleLoginService extends ContainerLifeCycle implements LoginServi
     private static final String token_endpoint = "https://oauth2.googleapis.com/token";
     private static final String issuer = "https://accounts.google.com";
 
-    private GoogleUserStore _userStore;
+    private GoogleUserStore _userStore = new GoogleUserStore();
     private IdentityService identityService = new DefaultIdentityService();
 
     private final String clientId;

@@ -31,7 +31,6 @@ import org.eclipse.jetty.security.ConstraintMapping;
 import org.eclipse.jetty.security.ConstraintSecurityHandler;
 import org.eclipse.jetty.security.authentication.GoogleAuthenticator;
 import org.eclipse.jetty.security.google.GoogleLoginService;
-import org.eclipse.jetty.security.google.GoogleUserStore;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.util.log.Log;
@@ -154,10 +153,7 @@ public class GoogleAuthenticationTest
         securityHandler.addConstraintMapping(loginMapping);
 
         // configure loginservice with user store
-        GoogleUserStore userStore = new GoogleUserStore();
-        userStore.addUser("114260987481616800581", new String[]{"user"});
         GoogleLoginService loginService = new GoogleLoginService(clientId, clientSecret, redirectUri);
-        loginService.setUserStore(userStore);
         securityHandler.setLoginService(loginService);
 
         Authenticator authenticator = new GoogleAuthenticator(clientId, redirectUri, "/error");

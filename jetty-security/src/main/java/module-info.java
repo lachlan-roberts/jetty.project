@@ -32,5 +32,5 @@ module org.eclipse.jetty.security
     requires static java.security.jgss;
 
     // TODO: only if using GoogleAuthenticator?
-    requires org.eclipse.jetty.util.ajax;
+    requires static org.eclipse.jetty.util.ajax;
 }
