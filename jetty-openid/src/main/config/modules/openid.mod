@@ -7,4 +7,5 @@ Adds OpenId Connect authentication.
 security
 
 [lib]
+lib/jetty-openid-${jetty.version}.jar
 lib/jetty-util-ajax-${jetty.version}.jar

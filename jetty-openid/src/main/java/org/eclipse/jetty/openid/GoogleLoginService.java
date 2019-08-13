@@ -28,6 +28,7 @@ import org.eclipse.jetty.security.LoginService;
 import org.eclipse.jetty.security.PropertyUserStore;
 import org.eclipse.jetty.security.UserStore;
 import org.eclipse.jetty.server.UserIdentity;
+import org.eclipse.jetty.util.annotation.Name;
 import org.eclipse.jetty.util.component.ContainerLifeCycle;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
@@ -47,7 +48,7 @@ public class GoogleLoginService extends ContainerLifeCycle implements LoginServi
     private final String clientSecret;
     private final String redirectUri;
 
-    public GoogleLoginService(String clientId, String clientSecret, String redirectUri)
+    public GoogleLoginService(@Name("clientId") String clientId, @Name("clientSecret") String clientSecret, @Name("redirectUri") String redirectUri)
     {
         this.clientId = clientId;
         this.clientSecret = clientSecret;
