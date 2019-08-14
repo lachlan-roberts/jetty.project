@@ -86,6 +86,9 @@ public class GoogleCredentials
             {
                 String jwt = getJWT(clientId, clientSecret, redirectUri, tokenEndpoint, issuer);
                 userInfo = decodeJWT(jwt);
+
+                if (LOG.isDebugEnabled())
+                    LOG.debug("userInfo {}", userInfo);
             }
             finally
             {
@@ -124,7 +127,8 @@ public class GoogleCredentials
 
     private Map<String, String> decodeJWT(String jwt) throws IOException
     {
-        LOG.warn("decodeJWT {}", jwt);
+        if (LOG.isDebugEnabled())
+            LOG.debug("decodeJWT {}", jwt);
 
         // Decode the id_token JWT to get the user information
         // TODO: in production this verification should be done locally with appropriate libraries
@@ -138,7 +142,8 @@ public class GoogleCredentials
 
     private String getJWT(String clientId, String clientSecret, String redirectUri, String tokenEndpoint, String issuer) throws IOException
     {
-        LOG.warn("getJWT {}", authCode);
+        if (LOG.isDebugEnabled())
+            LOG.debug("getJWT {}", authCode);
 
         // Use the auth code to get the id_token from the OpenID Provider
         String urlParameters = "code=" + authCode +
