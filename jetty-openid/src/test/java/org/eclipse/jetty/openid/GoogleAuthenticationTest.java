@@ -29,7 +29,7 @@ import org.eclipse.jetty.http.MimeTypes;
 import org.eclipse.jetty.security.Authenticator;
 import org.eclipse.jetty.security.ConstraintMapping;
 import org.eclipse.jetty.security.ConstraintSecurityHandler;
-import org.eclipse.jetty.security.PropertyUserStore;
+import org.eclipse.jetty.security.HashLoginService;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.toolchain.test.MavenTestingUtils;
@@ -84,6 +84,7 @@ public class GoogleAuthenticationTest
                 Map<String, String> userInfo = (Map)request.getSession().getAttribute(GoogleAuthenticator.__USER_INFO);
                 response.getWriter().println("<p>Welcome: " + userInfo.get("name") + "</p>");
                 response.getWriter().println("<a href=\"/profile\">Profile</a><br>");
+                response.getWriter().println("<a href=\"/admin\">Admin</a><br>");
                 response.getWriter().println("<a href=\"/logout\">Logout</a><br>");
             }
             else
@@ -133,7 +134,7 @@ public class GoogleAuthenticationTest
     public void runAuthenticationDemo() throws Exception
     {
         Server server = new Server(8080);
-        ServletContextHandler context = new ServletContextHandler(server, "/", ServletContextHandler.SESSIONS | ServletContextHandler.SECURITY);
+        ServletContextHandler context = new ServletContextHandler(server, "/", ServletContextHandler.SESSIONS);
 
         // Add servlets
         context.addServlet(ProfilePage.class, "/profile");
@@ -167,20 +168,17 @@ public class GoogleAuthenticationTest
 
         // security handler
         ConstraintSecurityHandler securityHandler = new ConstraintSecurityHandler();
+        securityHandler.setRealmName("GoogleAuthentication");
         securityHandler.addConstraintMapping(profileMapping);
         securityHandler.addConstraintMapping(loginMapping);
         securityHandler.addConstraintMapping(adminMapping);
 
-        PropertyUserStore userStore = new PropertyUserStore();
-        userStore.setConfig(MavenTestingUtils.getTestResourceFile("realm.properties").getAbsolutePath());
-        userStore.setHotReload(true);
-
-        // TODO: credential cant be null or NPE but is meaningless for googleAuth
-        //userStore.addUser("114260987481616800581", Credential.getCredential("null"), new String[]{"admin"});
+        HashLoginService hashLoginService = new HashLoginService();
+        hashLoginService.setConfig(MavenTestingUtils.getTestResourceFile("realm.properties").getAbsolutePath());
+        hashLoginService.setHotReload(true);
 
         // configure loginservice with user store
-        GoogleLoginService loginService = new GoogleLoginService(clientId, clientSecret, redirectUri);
-        loginService.setUserStore(userStore);
+        GoogleLoginService loginService = new GoogleLoginService(clientId, clientSecret, redirectUri, hashLoginService);
         securityHandler.setLoginService(loginService);
 
         Authenticator authenticator = new GoogleAuthenticator(clientId, redirectUri, "/error");
