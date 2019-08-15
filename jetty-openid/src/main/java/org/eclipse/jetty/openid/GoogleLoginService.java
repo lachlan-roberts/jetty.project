@@ -20,6 +20,7 @@ package org.eclipse.jetty.openid;
 
 import java.io.IOException;
 import java.security.Principal;
+import javax.security.auth.Subject;
 import javax.servlet.ServletRequest;
 
 import org.eclipse.jetty.security.DefaultIdentityService;
@@ -35,13 +36,12 @@ import org.eclipse.jetty.util.log.Logger;
 
 public class GoogleLoginService extends ContainerLifeCycle implements LoginService
 {
-
     private static final Logger LOG = Log.getLogger(GoogleLoginService.class);
 
     private static final String token_endpoint = "https://oauth2.googleapis.com/token";
     private static final String issuer = "https://accounts.google.com";
 
-    private GoogleUserStore _userStore = new GoogleUserStore();
+    private UserStore _userStore;
     private IdentityService identityService = new DefaultIdentityService();
 
     private final String clientId;
@@ -78,21 +78,15 @@ public class GoogleLoginService extends ContainerLifeCycle implements LoginServi
             return null;
         }
 
-        UserIdentity userIdentity = _userStore.getUserIdentity(googleCredentials.getUserId());
-        if (userIdentity != null)
-        {
-            // if we have a userIdentity update the credentials
-            GoogleCredentials existingCredentials = ((GoogleUserPrincipal)userIdentity.getUserPrincipal()).getCredentials();
-            existingCredentials.update(googleCredentials);
-        }
-        else
-        {
-            // otherwise we will register a new userIdentity
-            _userStore.addUser(googleCredentials, new String[]{"user"});
-            userIdentity = _userStore.getUserIdentity(googleCredentials.getUserId());
-        }
+        // create user and return userIdentity
+        GoogleUserPrincipal userPrincipal = new GoogleUserPrincipal(googleCredentials);
+        Subject subject = new Subject();
+        subject.getPrincipals().add(userPrincipal);
+        subject.getPrivateCredentials().add(credentials);
+        subject.setReadOnly();
 
-        return userIdentity;
+        // TODO: do we need to use an IdentityService or is this fine??
+        return new GoogleUserIdentity(subject, userPrincipal, _userStore);
     }
 
     @Override
@@ -118,7 +112,7 @@ public class GoogleLoginService extends ContainerLifeCycle implements LoginServi
      *
      * @param userStore the {@link UserStore} implementation to use
      */
-    public void setUserStore(GoogleUserStore userStore)
+    public void setUserStore(UserStore userStore)
     {
         updateBean(_userStore, userStore);
         _userStore = userStore;
@@ -129,7 +123,7 @@ public class GoogleLoginService extends ContainerLifeCycle implements LoginServi
      *
      * @return the UserStore
      */
-    GoogleUserStore getUserStore()
+    UserStore getUserStore()
     {
         return _userStore;
     }

@@ -38,12 +38,6 @@ public class GoogleCredentials
     private String authCode;
     private Map<String, String> userInfo;
 
-    public GoogleCredentials(Map<String, String> userInfo)
-    {
-        this.authCode = null;
-        this.userInfo = userInfo;
-    }
-
     public GoogleCredentials(String authCode)
     {
         this.authCode = authCode;

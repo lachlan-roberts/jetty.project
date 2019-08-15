@@ -29,8 +29,10 @@ import org.eclipse.jetty.http.MimeTypes;
 import org.eclipse.jetty.security.Authenticator;
 import org.eclipse.jetty.security.ConstraintMapping;
 import org.eclipse.jetty.security.ConstraintSecurityHandler;
+import org.eclipse.jetty.security.PropertyUserStore;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.toolchain.test.MavenTestingUtils;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.util.security.Constraint;
@@ -39,6 +41,15 @@ import org.junit.jupiter.api.Test;
 public class GoogleAuthenticationTest
 {
     private static final Logger LOG = Log.getLogger(GoogleAuthenticationTest.class);
+
+    public static class AdminPage extends HttpServlet
+    {
+        @Override
+        protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException
+        {
+            response.getWriter().println("<p>this is the admin page "+request.getUserPrincipal()+": <a href=\"/\">Home</a></p>");
+        }
+    }
 
     public static class LoginPage extends HttpServlet
     {
@@ -127,6 +138,7 @@ public class GoogleAuthenticationTest
         // Add servlets
         context.addServlet(ProfilePage.class, "/profile");
         context.addServlet(LoginPage.class, "/login");
+        context.addServlet(AdminPage.class, "/admin");
         context.addServlet(LogoutPage.class, "/logout");
         context.addServlet(HomePage.class, "/*");
         context.addServlet(ErrorPage.class, "/error");
@@ -134,8 +146,13 @@ public class GoogleAuthenticationTest
         // configure security constraints
         Constraint constraint = new Constraint();
         constraint.setName(Constraint.__GOOGLE_AUTH);
-        constraint.setRoles(new String[]{"user","admin","moderator"});
+        constraint.setRoles(new String[]{"**"});
         constraint.setAuthenticate(true);
+
+        Constraint adminConstraint = new Constraint();
+        adminConstraint.setName(Constraint.__GOOGLE_AUTH);
+        adminConstraint.setRoles(new String[]{"admin"});
+        adminConstraint.setAuthenticate(true);
 
         // constraint mappings
         ConstraintMapping profileMapping = new ConstraintMapping();
@@ -144,14 +161,26 @@ public class GoogleAuthenticationTest
         ConstraintMapping loginMapping = new ConstraintMapping();
         loginMapping.setConstraint(constraint);
         loginMapping.setPathSpec("/login");
+        ConstraintMapping adminMapping = new ConstraintMapping();
+        adminMapping.setConstraint(adminConstraint);
+        adminMapping.setPathSpec("/admin");
 
         // security handler
         ConstraintSecurityHandler securityHandler = new ConstraintSecurityHandler();
         securityHandler.addConstraintMapping(profileMapping);
         securityHandler.addConstraintMapping(loginMapping);
+        securityHandler.addConstraintMapping(adminMapping);
+
+        PropertyUserStore userStore = new PropertyUserStore();
+        userStore.setConfig(MavenTestingUtils.getTestResourceFile("realm.properties").getAbsolutePath());
+        userStore.setHotReload(true);
+
+        // TODO: credential cant be null or NPE but is meaningless for googleAuth
+        //userStore.addUser("114260987481616800581", Credential.getCredential("null"), new String[]{"admin"});
 
         // configure loginservice with user store
         GoogleLoginService loginService = new GoogleLoginService(clientId, clientSecret, redirectUri);
+        loginService.setUserStore(userStore);
         securityHandler.setLoginService(loginService);
 
         Authenticator authenticator = new GoogleAuthenticator(clientId, redirectUri, "/error");
