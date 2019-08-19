@@ -59,9 +59,11 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @Measurement(iterations = 7, time = 500, timeUnit = TimeUnit.MILLISECONDS)
 public class CustomRequestLogBenchmark
 {
-    private static final String OLD = "OLD";
-    private static final String NEW = "NEW";
-    private static final int NUM_REQUESTS = 10000;
+    private static final String STATIC = "STATIC";
+    private static final String METHOD_LOOKUP = "METHOD_LOOKUP";
+    private static final String METHODHANDLE_LIST = "METHODHANDLE_LIST";
+    private static final String METHODHANDLE_CHAIN = "METHODHANDLE_CHAIN";
+    private static final int NUM_REQUESTS = 1000;
     public static List<ReqResp> requests = new ArrayList<>();
 
     public static class ReqResp
@@ -76,7 +78,7 @@ public class CustomRequestLogBenchmark
         }
     }
 
-    @Param({OLD, NEW})
+    @Param({STATIC, METHOD_LOOKUP, METHODHANDLE_LIST, METHODHANDLE_CHAIN})
     public static String requestLogType;
     public static LogWriterQueue logWriter = new LogWriterQueue();
     private static RequestLog requestLog;
@@ -84,14 +86,14 @@ public class CustomRequestLogBenchmark
     @Setup(Level.Trial)
     public static void setupTrial() throws Exception
     {
-        for (int i = 0; i< NUM_REQUESTS; i++)
+        for (int i = 0; i<NUM_REQUESTS; i++)
         {
             requests.add(new ReqResp(generateFakeRequest(), generateFakeResponse()));
         }
 
         switch (requestLogType)
         {
-            case OLD:
+            case STATIC:
                 AbstractNCSARequestLog rl = new AbstractNCSARequestLog(logWriter);
                 rl.setExtended(true);
                 rl.setLogDateFormat(CustomRequestLog.DEFAULT_DATE_FORMAT);
@@ -99,8 +101,16 @@ public class CustomRequestLogBenchmark
                 requestLog = rl;
                 break;
 
-            case NEW:
+            case METHODHANDLE_CHAIN:
                 requestLog = new CustomRequestLog(logWriter, CustomRequestLog.EXTENDED_NCSA_FORMAT);
+                break;
+
+            case METHODHANDLE_LIST:
+                requestLog = new CustomListRequestLog(logWriter, CustomRequestLog.EXTENDED_NCSA_FORMAT);
+                break;
+
+            case METHOD_LOOKUP:
+                requestLog = new CustomLookupRequestLog(logWriter, CustomRequestLog.EXTENDED_NCSA_FORMAT);
                 break;
 
             default:
@@ -133,8 +143,8 @@ public class CustomRequestLogBenchmark
     {
         Options opt = new OptionsBuilder()
                 .include(CustomRequestLogBenchmark.class.getSimpleName())
-                .warmupIterations(20)
-                .measurementIterations(10)
+                .warmupIterations(30)
+                .measurementIterations(20)
                 .forks(1)
                 .threads(1)
                 .build();
