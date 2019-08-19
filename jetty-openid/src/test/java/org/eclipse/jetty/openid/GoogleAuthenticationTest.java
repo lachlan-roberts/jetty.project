@@ -126,6 +126,7 @@ public class GoogleAuthenticationTest
         }
     }
 
+    public static final String provider = "https://accounts.google.com/";
     public static final String clientId = "1051168419525-5nl60mkugb77p9j194mrh287p1e0ahfi.apps.googleusercontent.com";
     public static final String clientSecret = "XT_MIsSv_aUCGollauCaJY8S";
     public static final String redirectUri = "http://localhost:8080/j_security_check";
@@ -177,11 +178,13 @@ public class GoogleAuthenticationTest
         hashLoginService.setConfig(MavenTestingUtils.getTestResourceFile("realm.properties").getAbsolutePath());
         hashLoginService.setHotReload(true);
 
+        Configuration configuration = new Configuration(provider, clientId, clientSecret, redirectUri);
+
         // configure loginservice with user store
-        GoogleLoginService loginService = new GoogleLoginService(clientId, clientSecret, redirectUri, hashLoginService);
+        GoogleLoginService loginService = new GoogleLoginService(configuration, hashLoginService);
         securityHandler.setLoginService(loginService);
 
-        Authenticator authenticator = new GoogleAuthenticator(clientId, redirectUri, "/error");
+        Authenticator authenticator = new GoogleAuthenticator(configuration, "/error");
         securityHandler.setAuthenticator(authenticator);
         context.setSecurityHandler(securityHandler);
 

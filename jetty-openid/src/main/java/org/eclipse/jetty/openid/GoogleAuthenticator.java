@@ -52,7 +52,7 @@ import org.eclipse.jetty.util.security.Constraint;
  * <p>This authenticator implements Google authentication using OpenId Connect on top of OAuth 2.0.
  *
  * <p>The google authenticator redirects unauthenticated requests to the google identity providers authorization endpoint
- * which will eventually redirect back to the {@link #_redirectUri} with an authCode which will be exchanged with
+ * which will eventually redirect back to the redirectUri with an authCode which will be exchanged with
  * the google token_endpoint for an id_token. The request is then restored back to the original uri requested.
  * GoogleAuthentication uses {@link SessionAuthentication} to wrap Authentication results so that they
  * are  associated with the session.</p>
@@ -60,8 +60,8 @@ import org.eclipse.jetty.util.security.Constraint;
 public class GoogleAuthenticator extends LoginAuthenticator
 {
     private static final Logger LOG = Log.getLogger(GoogleAuthenticator.class);
-    private static final String AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 
+    public static final String __OPENID_CONFIG = "org.eclipse.jetty.openid.configuration";
     public static final String __USER_INFO = "org.eclipse.jetty.openid.user_info";
     public static final String __CLIENT_ID = "org.eclipse.jetty.openid.client_id";
     public static final String __REDIRECT_URI = "org.eclipse.jetty.openid.redirect_uri";
@@ -72,8 +72,7 @@ public class GoogleAuthenticator extends LoginAuthenticator
     public static final String __J_METHOD = "org.eclipse.jetty.openid.google_METHOD";
     public static final String __CSRF_TOKEN = "org.eclipse.jetty.openid.csrf_token";
 
-    private String _clientId;
-    private String _redirectUri;
+    private Configuration _configuration;
     private String _errorPage;
     private String _errorPath;
     private boolean _alwaysSaveUri;
@@ -82,11 +81,9 @@ public class GoogleAuthenticator extends LoginAuthenticator
     {
     }
 
-    public GoogleAuthenticator(String clientId, String redirectUri, String errorPage)
+    public GoogleAuthenticator(Configuration configuration, String errorPage)
     {
-        this._clientId = clientId;
-        this._redirectUri = redirectUri;
-
+        this._configuration = configuration;
         if (errorPage != null)
             setErrorPage(errorPage);
     }
@@ -96,17 +93,11 @@ public class GoogleAuthenticator extends LoginAuthenticator
     {
         super.setConfiguration(configuration);
 
-        String success = configuration.getInitParameter(__REDIRECT_URI);
-        if (success != null)
-            this._redirectUri = success;
+        // todo get configuration as init param (or construct)
 
         String error = configuration.getInitParameter(__ERROR_PAGE);
         if (error != null)
             setErrorPage(error);
-
-        String clientId = configuration.getInitParameter(__CLIENT_ID);
-        if (clientId != null)
-            this._clientId = clientId;
     }
 
     @Override
@@ -429,9 +420,9 @@ public class GoogleAuthenticator extends LoginAuthenticator
             session.setAttribute(__CSRF_TOKEN, antiForgeryToken);
         }
 
-        return AUTH_ENDPOINT +
-            "?client_id=" + _clientId +
-            "&redirect_uri=" + _redirectUri +
+        return _configuration.getAuthEndpoint() +
+            "?client_id=" + _configuration.getClientId() +
+            "&redirect_uri=" + _configuration.getRedirectUri() +
             "&scope=openid%20email%20profile" +
             "&state=" + antiForgeryToken +
             "&response_type=code";

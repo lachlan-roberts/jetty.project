@@ -53,32 +53,17 @@ public class GoogleCredentials
         return userInfo;
     }
 
-    public void update(GoogleCredentials credentials)
-    {
-        if (!userInfo.get("sub").equals(credentials.getUserInfo().get("sub")))
-            throw new IllegalStateException();
-
-        this.authCode = credentials.authCode;
-        this.clientId = credentials.clientId;
-
-        // Update the old userInfo
-        for (String key : credentials.userInfo.keySet())
-        {
-            userInfo.put(key, credentials.userInfo.get(key));
-        }
-    }
-
-    public void redeemAuthCode(String clientId, String clientSecret, String redirectUri, String tokenEndpoint, String issuer) throws IOException
+    public void redeemAuthCode(Configuration configuration) throws IOException
     {
         if (LOG.isDebugEnabled())
             LOG.debug("redeemAuthCode() {}", this);
 
-        this.clientId = clientId;
+        this.clientId = configuration.getClientId();
         if (authCode != null)
         {
             try
             {
-                String jwt = getJWT(clientId, clientSecret, redirectUri, tokenEndpoint, issuer);
+                String jwt = getJWT(configuration);
                 userInfo = decodeJWT(jwt);
 
                 if (LOG.isDebugEnabled())
@@ -134,7 +119,7 @@ public class GoogleCredentials
         return parse;
     }
 
-    private String getJWT(String clientId, String clientSecret, String redirectUri, String tokenEndpoint, String issuer) throws IOException
+    private String getJWT(Configuration config) throws IOException
     {
         if (LOG.isDebugEnabled())
             LOG.debug("getJWT {}", authCode);
@@ -142,16 +127,16 @@ public class GoogleCredentials
         // Use the auth code to get the id_token from the OpenID Provider
         String urlParameters = "code=" + authCode +
             "&client_id=" + clientId +
-            "&client_secret=" + clientSecret +
-            "&redirect_uri=" + redirectUri +
+            "&client_secret=" + config.getClientSecret() +
+            "&redirect_uri=" + config.getRedirectUri() +
             "&grant_type=authorization_code";
 
         byte[] payload = urlParameters.getBytes(StandardCharsets.UTF_8);
-        URL url = new URL(tokenEndpoint);
+        URL url = new URL(config.getTokenEndpoint());
         HttpURLConnection connection = (HttpURLConnection)url.openConnection();
         connection.setDoOutput(true);
         connection.setRequestMethod("POST");
-        connection.setRequestProperty("Host", issuer);
+        connection.setRequestProperty("Host", config.getIssuer());
         connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
         connection.setRequestProperty( "charset", "utf-8");
 

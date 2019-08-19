@@ -34,25 +34,18 @@ public class GoogleLoginService extends ContainerLifeCycle implements LoginServi
 {
     private static final Logger LOG = Log.getLogger(GoogleLoginService.class);
 
-    private static final String token_endpoint = "https://oauth2.googleapis.com/token";
-    private static final String issuer = "https://accounts.google.com";
-
-    private final String clientId;
-    private final String clientSecret;
-    private final String redirectUri;
+    private final Configuration _configuration;
     private final LoginService loginService;
     private IdentityService identityService;
 
-    public GoogleLoginService(String clientId, String clientSecret, String redirectUri)
+    public GoogleLoginService(Configuration configuration)
     {
-        this(clientId, clientSecret, redirectUri, null);
+        this(configuration, null);
     }
 
-    public GoogleLoginService(String clientId, String clientSecret, String redirectUri, LoginService loginService)
+    public GoogleLoginService(Configuration configuration, LoginService loginService)
     {
-        this.clientId = clientId;
-        this.clientSecret = clientSecret;
-        this.redirectUri = redirectUri;
+        _configuration = configuration;
         this.loginService = loginService;
         addBean(this.loginService);
     }
@@ -72,7 +65,7 @@ public class GoogleLoginService extends ContainerLifeCycle implements LoginServi
         GoogleCredentials googleCredentials = (GoogleCredentials)credentials;
         try
         {
-            googleCredentials.redeemAuthCode(clientId, clientSecret, redirectUri, token_endpoint, issuer);
+            googleCredentials.redeemAuthCode(_configuration);
         }
         catch (IOException e)
         {
