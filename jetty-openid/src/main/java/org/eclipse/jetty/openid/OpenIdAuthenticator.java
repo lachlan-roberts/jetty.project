@@ -57,9 +57,9 @@ import org.eclipse.jetty.util.security.Constraint;
  * GoogleAuthentication uses {@link SessionAuthentication} to wrap Authentication results so that they
  * are  associated with the session.</p>
  */
-public class GoogleAuthenticator extends LoginAuthenticator
+public class OpenIdAuthenticator extends LoginAuthenticator
 {
-    private static final Logger LOG = Log.getLogger(GoogleAuthenticator.class);
+    private static final Logger LOG = Log.getLogger(OpenIdAuthenticator.class);
 
     public static final String __OPENID_CONFIG = "org.eclipse.jetty.openid.configuration";
     public static final String __USER_INFO = "org.eclipse.jetty.openid.user_info";
@@ -72,16 +72,16 @@ public class GoogleAuthenticator extends LoginAuthenticator
     public static final String __J_METHOD = "org.eclipse.jetty.openid.google_METHOD";
     public static final String __CSRF_TOKEN = "org.eclipse.jetty.openid.csrf_token";
 
-    private Configuration _configuration;
+    private OpenIdConfiguration _configuration;
     private String _errorPage;
     private String _errorPath;
     private boolean _alwaysSaveUri;
 
-    public GoogleAuthenticator()
+    public OpenIdAuthenticator()
     {
     }
 
-    public GoogleAuthenticator(Configuration configuration, String errorPage)
+    public OpenIdAuthenticator(OpenIdConfiguration configuration, String errorPage)
     {
         this._configuration = configuration;
         if (errorPage != null)
@@ -94,7 +94,6 @@ public class GoogleAuthenticator extends LoginAuthenticator
         super.setConfiguration(configuration);
 
         // todo get configuration as init param (or construct)
-
         String error = configuration.getInitParameter(__ERROR_PAGE);
         if (error != null)
             setErrorPage(error);
@@ -155,7 +154,7 @@ public class GoogleAuthenticator extends LoginAuthenticator
             HttpSession session = ((HttpServletRequest)request).getSession();
             Authentication cached = new SessionAuthentication(getAuthMethod(), user, credentials);
             session.setAttribute(SessionAuthentication.__J_AUTHENTICATED, cached);
-            session.setAttribute(__USER_INFO, ((GoogleCredentials)credentials).getUserInfo());
+            session.setAttribute(__USER_INFO, ((OpenIdCredentials)credentials).getUserInfo());
         }
         return user;
     }
@@ -251,7 +250,7 @@ public class GoogleAuthenticator extends LoginAuthenticator
                     }
 
                     // Attempt to login with the provided authCode
-                    GoogleCredentials credentials = new GoogleCredentials(authCode);
+                    OpenIdCredentials credentials = new OpenIdCredentials(authCode);
                     UserIdentity user = login(null, credentials, request);
                     HttpSession session = request.getSession(false);
                     if (user != null)

@@ -30,20 +30,20 @@ import org.eclipse.jetty.util.component.ContainerLifeCycle;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 
-public class GoogleLoginService extends ContainerLifeCycle implements LoginService
+public class OpenIdLoginService extends ContainerLifeCycle implements LoginService
 {
-    private static final Logger LOG = Log.getLogger(GoogleLoginService.class);
+    private static final Logger LOG = Log.getLogger(OpenIdLoginService.class);
 
-    private final Configuration _configuration;
+    private final OpenIdConfiguration _configuration;
     private final LoginService loginService;
     private IdentityService identityService;
 
-    public GoogleLoginService(Configuration configuration)
+    public OpenIdLoginService(OpenIdConfiguration configuration)
     {
         this(configuration, null);
     }
 
-    public GoogleLoginService(Configuration configuration, LoginService loginService)
+    public OpenIdLoginService(OpenIdConfiguration configuration, LoginService loginService)
     {
         _configuration = configuration;
         this.loginService = loginService;
@@ -62,10 +62,10 @@ public class GoogleLoginService extends ContainerLifeCycle implements LoginServi
         if (LOG.isDebugEnabled())
             LOG.debug("login({}, {}, {})", identifier, credentials, req);
 
-        GoogleCredentials googleCredentials = (GoogleCredentials)credentials;
+        OpenIdCredentials openIdCredentials = (OpenIdCredentials)credentials;
         try
         {
-            googleCredentials.redeemAuthCode(_configuration);
+            openIdCredentials.redeemAuthCode(_configuration);
         }
         catch (IOException e)
         {
@@ -73,7 +73,7 @@ public class GoogleLoginService extends ContainerLifeCycle implements LoginServi
             return null;
         }
 
-        GoogleUserPrincipal userPrincipal = new GoogleUserPrincipal(googleCredentials);
+        OpenIdUserPrincipal userPrincipal = new OpenIdUserPrincipal(openIdCredentials);
         Subject subject = new Subject();
         subject.getPrincipals().add(userPrincipal);
         subject.getPrivateCredentials().add(credentials);
@@ -81,11 +81,11 @@ public class GoogleLoginService extends ContainerLifeCycle implements LoginServi
 
         if (loginService != null)
         {
-            UserIdentity userIdentity = loginService.login(googleCredentials.getUserId(), "", req);
+            UserIdentity userIdentity = loginService.login(openIdCredentials.getUserId(), "", req);
             if (userIdentity == null)
                 return null;
 
-            return new GoogleUserIdentity(subject, userPrincipal, userIdentity);
+            return new OpenIdUserIdentity(subject, userPrincipal, userIdentity);
         }
 
         return identityService.newUserIdentity(subject, userPrincipal, new String[0]);
@@ -95,10 +95,10 @@ public class GoogleLoginService extends ContainerLifeCycle implements LoginServi
     public boolean validate(UserIdentity user)
     {
         Principal userPrincipal = user.getUserPrincipal();
-        if (!(userPrincipal instanceof GoogleUserPrincipal))
+        if (!(userPrincipal instanceof OpenIdUserPrincipal))
             return false;
 
-        GoogleCredentials credentials = ((GoogleUserPrincipal)userPrincipal).getCredentials();
+        OpenIdCredentials credentials = ((OpenIdUserPrincipal)userPrincipal).getCredentials();
         return credentials.validate();
     }
 

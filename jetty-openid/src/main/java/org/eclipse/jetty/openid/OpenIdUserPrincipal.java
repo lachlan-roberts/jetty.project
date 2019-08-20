@@ -21,17 +21,17 @@ package org.eclipse.jetty.openid;
 import java.io.Serializable;
 import java.security.Principal;
 
-public class GoogleUserPrincipal implements Principal, Serializable
+public class OpenIdUserPrincipal implements Principal, Serializable
 {
     private static final long serialVersionUID = -6226920753748399662L;
-    private final GoogleCredentials _credentials;
+    private final OpenIdCredentials _credentials;
 
-    public GoogleUserPrincipal(GoogleCredentials credentials)
+    public OpenIdUserPrincipal(OpenIdCredentials credentials)
     {
         _credentials = credentials;
     }
 
-    public GoogleCredentials getCredentials()
+    public OpenIdCredentials getCredentials()
     {
         return _credentials;
     }

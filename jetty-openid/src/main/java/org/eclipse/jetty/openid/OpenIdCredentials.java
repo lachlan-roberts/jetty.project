@@ -30,15 +30,15 @@ import org.eclipse.jetty.util.ajax.JSON;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 
-public class GoogleCredentials
+public class OpenIdCredentials
 {
-    private static final Logger LOG = Log.getLogger(GoogleCredentials.class);
+    private static final Logger LOG = Log.getLogger(OpenIdCredentials.class);
 
     private String clientId;
     private String authCode;
     private Map<String, String> userInfo;
 
-    public GoogleCredentials(String authCode)
+    public OpenIdCredentials(String authCode)
     {
         this.authCode = authCode;
     }
@@ -53,7 +53,7 @@ public class GoogleCredentials
         return userInfo;
     }
 
-    public void redeemAuthCode(Configuration configuration) throws IOException
+    public void redeemAuthCode(OpenIdConfiguration configuration) throws IOException
     {
         if (LOG.isDebugEnabled())
             LOG.debug("redeemAuthCode() {}", this);
@@ -119,7 +119,7 @@ public class GoogleCredentials
         return parse;
     }
 
-    private String getJWT(Configuration config) throws IOException
+    private String getJWT(OpenIdConfiguration config) throws IOException
     {
         if (LOG.isDebugEnabled())
             LOG.debug("getJWT {}", authCode);

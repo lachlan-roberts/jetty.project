@@ -5,18 +5,18 @@ import javax.security.auth.Subject;
 
 import org.eclipse.jetty.server.UserIdentity;
 
-public class GoogleUserIdentity implements UserIdentity
+public class OpenIdUserIdentity implements UserIdentity
 {
     private final Subject subject;
     private final Principal userPrincipal;
     private final UserIdentity userIdentity;
 
-    public GoogleUserIdentity(Subject subject, Principal userPrincipal)
+    public OpenIdUserIdentity(Subject subject, Principal userPrincipal)
     {
         this(subject, userPrincipal, null);
     }
 
-    public GoogleUserIdentity(Subject subject, Principal userPrincipal, UserIdentity userIdentity)
+    public OpenIdUserIdentity(Subject subject, Principal userPrincipal, UserIdentity userIdentity)
     {
         this.subject = subject;
         this.userPrincipal = userPrincipal;

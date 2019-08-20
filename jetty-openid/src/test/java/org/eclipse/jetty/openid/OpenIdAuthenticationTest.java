@@ -38,9 +38,9 @@ import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.util.security.Constraint;
 import org.junit.jupiter.api.Test;
 
-public class GoogleAuthenticationTest
+public class OpenIdAuthenticationTest
 {
-    private static final Logger LOG = Log.getLogger(GoogleAuthenticationTest.class);
+    private static final Logger LOG = Log.getLogger(OpenIdAuthenticationTest.class);
 
     public static class AdminPage extends HttpServlet
     {
@@ -81,7 +81,7 @@ public class GoogleAuthenticationTest
             Principal userPrincipal = request.getUserPrincipal();
             if (userPrincipal != null)
             {
-                Map<String, String> userInfo = (Map)request.getSession().getAttribute(GoogleAuthenticator.__USER_INFO);
+                Map<String, String> userInfo = (Map)request.getSession().getAttribute(OpenIdAuthenticator.__USER_INFO);
                 response.getWriter().println("<p>Welcome: " + userInfo.get("name") + "</p>");
                 response.getWriter().println("<a href=\"/profile\">Profile</a><br>");
                 response.getWriter().println("<a href=\"/admin\">Admin</a><br>");
@@ -100,7 +100,7 @@ public class GoogleAuthenticationTest
         protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException
         {
             response.setContentType(MimeTypes.Type.TEXT_HTML.asString());
-            Map<String, String> userInfo = (Map)request.getSession().getAttribute(GoogleAuthenticator.__USER_INFO);
+            Map<String, String> userInfo = (Map)request.getSession().getAttribute(OpenIdAuthenticator.__USER_INFO);
 
             response.getWriter().println("<!-- Add icon library -->\n" +
                 "<div class=\"card\">\n" +
@@ -178,13 +178,13 @@ public class GoogleAuthenticationTest
         hashLoginService.setConfig(MavenTestingUtils.getTestResourceFile("realm.properties").getAbsolutePath());
         hashLoginService.setHotReload(true);
 
-        Configuration configuration = new Configuration(provider, clientId, clientSecret, redirectUri);
+        OpenIdConfiguration configuration = new OpenIdConfiguration(provider, clientId, clientSecret, redirectUri);
 
         // configure loginservice with user store
-        GoogleLoginService loginService = new GoogleLoginService(configuration, hashLoginService);
+        OpenIdLoginService loginService = new OpenIdLoginService(configuration, hashLoginService);
         securityHandler.setLoginService(loginService);
 
-        Authenticator authenticator = new GoogleAuthenticator(configuration, "/error");
+        Authenticator authenticator = new OpenIdAuthenticator(configuration, "/error");
         securityHandler.setAuthenticator(authenticator);
         context.setSecurityHandler(securityHandler);
 

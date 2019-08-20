@@ -7,7 +7,7 @@ import java.util.Map;
 
 import org.eclipse.jetty.util.ajax.JSON;
 
-public class Configuration
+public class OpenIdConfiguration
 {
     private static String CONFIG_PATH = "/.well-known/openid-configuration";
 
@@ -22,7 +22,7 @@ public class Configuration
     private final String redirectUri;
 
 
-    public Configuration(String provider, String clientId, String clientSecret, String redirectUri) throws IOException
+    public OpenIdConfiguration(String provider, String clientId, String clientSecret, String redirectUri) throws IOException
     {
         this.clientId = clientId;
         this.clientSecret = clientSecret;
