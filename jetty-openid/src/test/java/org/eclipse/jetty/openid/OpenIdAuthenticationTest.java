@@ -126,11 +126,6 @@ public class OpenIdAuthenticationTest
         }
     }
 
-    public static final String provider = "https://accounts.google.com/";
-    public static final String clientId = "1051168419525-5nl60mkugb77p9j194mrh287p1e0ahfi.apps.googleusercontent.com";
-    public static final String clientSecret = "XT_MIsSv_aUCGollauCaJY8S";
-    public static final String redirectUri = "http://localhost:8080/j_security_check";
-
     @Test
     public void runAuthenticationDemo() throws Exception
     {
@@ -178,10 +173,27 @@ public class OpenIdAuthenticationTest
         hashLoginService.setConfig(MavenTestingUtils.getTestResourceFile("realm.properties").getAbsolutePath());
         hashLoginService.setHotReload(true);
 
-        OpenIdConfiguration configuration = new OpenIdConfiguration(provider, clientId, clientSecret, redirectUri);
+
+        final String redirectUri = "http://localhost:8080/j_security_check";
+
+        /*
+        // Google Authentication
+        OpenIdConfiguration configuration = new OpenIdConfiguration(
+            "https://accounts.google.com/",
+            "1051168419525-5nl60mkugb77p9j194mrh287p1e0ahfi.apps.googleusercontent.com",
+            "XT_MIsSv_aUCGollauCaJY8S",
+            redirectUri);
+         */
+
+        // Microsoft Authentication
+        OpenIdConfiguration configuration = new OpenIdConfiguration(
+            "https://login.microsoftonline.com/common/v2.0",
+            "5f05dea8-2bd9-45de-b30f-cf5c102b8784",
+            "IfhQJKi-5[vxhh_=ldqt0y4PkV3z_1ca",
+            redirectUri);
 
         // configure loginservice with user store
-        OpenIdLoginService loginService = new OpenIdLoginService(configuration, hashLoginService);
+        OpenIdLoginService loginService = new OpenIdLoginService(configuration);//, hashLoginService);
         securityHandler.setLoginService(loginService);
 
         Authenticator authenticator = new OpenIdAuthenticator(configuration, "/error");
@@ -190,5 +202,13 @@ public class OpenIdAuthenticationTest
 
         server.start();
         server.join();
+    }
+
+    @Test
+    public void decodeJwt() throws Exception
+    {
+        String jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
+
+        OpenIdCredentials.decodeJWT(jwt);
     }
 }

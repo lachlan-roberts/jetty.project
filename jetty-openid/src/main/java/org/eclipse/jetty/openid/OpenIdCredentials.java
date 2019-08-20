@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Map;
 
 import org.eclipse.jetty.util.ajax.JSON;
@@ -36,7 +37,7 @@ public class OpenIdCredentials
 
     private String clientId;
     private String authCode;
-    private Map<String, String> userInfo;
+    private Map<String, Object> userInfo;
 
     public OpenIdCredentials(String authCode)
     {
@@ -45,10 +46,10 @@ public class OpenIdCredentials
 
     public String getUserId()
     {
-        return userInfo.get("sub");
+        return (String)userInfo.get("sub");
     }
 
-    public Map<String, String> getUserInfo()
+    public Map<String, Object> getUserInfo()
     {
         return userInfo;
     }
@@ -77,46 +78,59 @@ public class OpenIdCredentials
         }
     }
 
-    public boolean validate()
+    public boolean validate(OpenIdConfiguration configuration)
     {
-        if (authCode != null || clientId == null || userInfo == null)
+        if (authCode != null || userInfo == null)
             return false;
 
+        // Check audience should be clientId
+        String audience = (String)userInfo.get("aud");
+        if (!configuration.getClientId().equals(audience))
+        {
+            LOG.warn("Audience claim MUST contain the value of the Issuer Identifier for the OP", this);
+            return false;
+        }
+
+        String issuer = (String)userInfo.get("iss");
+        if (!configuration.getIssuer().equals(issuer))
+        {
+            LOG.warn("Issuer claim MUST be the client_id of the OAuth Client {}", this);
+            return false;
+        }
+
         // Check expiry
-        long expiry = Long.parseLong(userInfo.get("exp"));
+        long expiry = (Long)userInfo.get("exp");
         long currentTimeSeconds = (long)(System.currentTimeMillis()/1000F);
         if (currentTimeSeconds > expiry)
         {
             if (LOG.isDebugEnabled())
-                LOG.debug("validate() expired {}", this);
-            return false;
-        }
-
-        // Check audience should be clientId
-        String audience = userInfo.get("aud");
-        if (!clientId.equals(audience))
-        {
-            if (LOG.isDebugEnabled())
-                LOG.debug("validate() audience was not clientId {}", this);
+                LOG.debug("OpenId Credentials expired {}", this);
             return false;
         }
 
         return true;
     }
 
-    private Map<String, String> decodeJWT(String jwt) throws IOException
+    protected static Map<String, Object> decodeJWT(String jwt) throws IOException
     {
         if (LOG.isDebugEnabled())
             LOG.debug("decodeJWT {}", jwt);
 
-        // Decode the id_token JWT to get the user information
-        // TODO: in production this verification should be done locally with appropriate libraries
-        // NOTE: it is not necessary to check signature if this comes directly from google (authorisation code flow)
-        final String tokenInfoEndpoint = "https://oauth2.googleapis.com/tokeninfo";
-        URL url = new URL(tokenInfoEndpoint+"?id_token="+jwt);
-        InputStream content = (InputStream)url.getContent();
-        Map<String, String> parse = (Map)JSON.parse(new String(content.readAllBytes()));
-        return parse;
+        String[] sections = jwt.split("\\.");
+        if (sections.length != 3)
+            throw new IllegalArgumentException("JWT does not contain 3 sections");
+
+        String jwtHeaderString = new String(Base64.getDecoder().decode(sections[0]), StandardCharsets.UTF_8);
+        String jwtClaimString = new String(Base64.getDecoder().decode(sections[1]), StandardCharsets.UTF_8);
+        String jwtSignature = sections[2];
+
+        Map<String, Object> jwtHeader = (Map)JSON.parse(jwtHeaderString);
+        LOG.debug("JWT Header: {}", jwtHeader);
+
+        // validate signature
+        LOG.warn("Signature NOT validated {}", jwtSignature);
+
+        return (Map)JSON.parse(jwtClaimString);
     }
 
     private String getJWT(OpenIdConfiguration config) throws IOException

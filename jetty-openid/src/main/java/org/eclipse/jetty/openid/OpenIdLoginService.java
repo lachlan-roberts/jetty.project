@@ -66,6 +66,7 @@ public class OpenIdLoginService extends ContainerLifeCycle implements LoginServi
         try
         {
             openIdCredentials.redeemAuthCode(_configuration);
+            // TODO: validate?
         }
         catch (IOException e)
         {
@@ -99,7 +100,7 @@ public class OpenIdLoginService extends ContainerLifeCycle implements LoginServi
             return false;
 
         OpenIdCredentials credentials = ((OpenIdUserPrincipal)userPrincipal).getCredentials();
-        return credentials.validate();
+        return credentials.validate(_configuration);
     }
 
     @Override

@@ -28,7 +28,9 @@ public class OpenIdConfiguration
         this.clientSecret = clientSecret;
         this.redirectUri = redirectUri;
 
-        URI providerUri = URI.create(provider).resolve(CONFIG_PATH);
+        if (provider.endsWith("/"))
+            provider = provider.substring(0, provider.length()-1);
+        URI providerUri = URI.create(provider + CONFIG_PATH);
         InputStream inputStream = providerUri.toURL().openConnection().getInputStream();
         String content = new String(inputStream.readAllBytes());
         Map discoveryDocument = (Map)JSON.parse(content);
@@ -38,6 +40,8 @@ public class OpenIdConfiguration
         tokenEndpoint = (String)discoveryDocument.get("token_endpoint");
         userInfoEndpoint = (String)discoveryDocument.get("userinfo_endpoint");
         jwksUri = (String)discoveryDocument.get("jwks_uri");
+
+        // TODO: assert these fields are not null
     }
 
     public String getAuthEndpoint()
