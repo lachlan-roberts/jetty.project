@@ -16,7 +16,7 @@
 //  ========================================================================
 //
 
-package org.eclipse.jetty.openid;
+package org.eclipse.jetty.security.openid;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -30,6 +30,7 @@ import javax.servlet.http.HttpSession;
 import org.eclipse.jetty.http.HttpMethod;
 import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.http.MimeTypes;
+import org.eclipse.jetty.security.LoginService;
 import org.eclipse.jetty.security.ServerAuthException;
 import org.eclipse.jetty.security.UserAuthentication;
 import org.eclipse.jetty.security.authentication.DeferredAuthentication;
@@ -47,30 +48,31 @@ import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.util.security.Constraint;
 
 /**
- * Google Authenticator.
+ * OpenId Connect Authenticator.
  *
- * <p>This authenticator implements Google authentication using OpenId Connect on top of OAuth 2.0.
+ * <p>This authenticator implements authentication using OpenId Connect on top of OAuth 2.0.
  *
- * <p>The google authenticator redirects unauthenticated requests to the google identity providers authorization endpoint
- * which will eventually redirect back to the redirectUri with an authCode which will be exchanged with
- * the google token_endpoint for an id_token. The request is then restored back to the original uri requested.
- * GoogleAuthentication uses {@link SessionAuthentication} to wrap Authentication results so that they
- * are  associated with the session.</p>
+ * <p>The authenticator redirects unauthenticated requests to the identity providers authorization endpoint
+ * which will eventually redirect back to the redirectUri with an authorization code which will be exchanged with
+ * the token_endpoint for an id_token. The request is then restored back to the original uri requested.
+ * {@link SessionAuthentication} is then used to wrap Authentication results so that they are associated with the session.</p>
  */
 public class OpenIdAuthenticator extends LoginAuthenticator
 {
     private static final Logger LOG = Log.getLogger(OpenIdAuthenticator.class);
 
-    public static final String __OPENID_CONFIG = "org.eclipse.jetty.openid.configuration";
-    public static final String __USER_INFO = "org.eclipse.jetty.openid.user_info";
-    public static final String __CLIENT_ID = "org.eclipse.jetty.openid.client_id";
-    public static final String __REDIRECT_URI = "org.eclipse.jetty.openid.redirect_uri";
-    public static final String __ERROR_PAGE = "org.eclipse.jetty.openid.error_page";
+    public static final String __USER_CLAIMS = "org.eclipse.jetty.security.openid.user_claims";
+    public static final String __RESPONSE_JSON = "org.eclipse.jetty.security.openid.response";
+
+    public static final String __IDENTITY_PROVIDER = "org.eclipse.jetty.security.openid.identity_provider";
+    public static final String __CLIENT_ID = "org.eclipse.jetty.security.openid.client_id";
+    public static final String __REDIRECT_URI = "org.eclipse.jetty.security.openid.redirect_uri";
+    public static final String __ERROR_PAGE = "org.eclipse.jetty.security.openid.error_page";
+    public static final String __J_URI = "org.eclipse.jetty.security.openid.URI";
+    public static final String __J_POST = "org.eclipse.jetty.security.openid.POST";
+    public static final String __J_METHOD = "org.eclipse.jetty.security.openid.METHOD";
+    public static final String __CSRF_TOKEN = "org.eclipse.jetty.security.openid.csrf_token";
     public static final String __J_SECURITY_CHECK = "/j_security_check";
-    public static final String __J_URI = "org.eclipse.jetty.openid.google_URI";
-    public static final String __J_POST = "org.eclipse.jetty.openid.google_POST";
-    public static final String __J_METHOD = "org.eclipse.jetty.openid.google_METHOD";
-    public static final String __CSRF_TOKEN = "org.eclipse.jetty.openid.csrf_token";
 
     private OpenIdConfiguration _configuration;
     private String _errorPage;
@@ -93,16 +95,23 @@ public class OpenIdAuthenticator extends LoginAuthenticator
     {
         super.setConfiguration(configuration);
 
-        // todo get configuration as init param (or construct)
         String error = configuration.getInitParameter(__ERROR_PAGE);
         if (error != null)
             setErrorPage(error);
+
+        if (_configuration != null)
+            return;
+
+        LoginService loginService = configuration.getLoginService();
+        if (!(loginService instanceof OpenIdLoginService))
+            throw new IllegalArgumentException("invalid LoginService");
+        this._configuration = ((OpenIdLoginService)loginService).getConfiguration();
     }
 
     @Override
     public String getAuthMethod()
     {
-        return Constraint.__GOOGLE_AUTH;
+        return Constraint.__OPENID_AUTH;
     }
 
     /**
@@ -148,13 +157,17 @@ public class OpenIdAuthenticator extends LoginAuthenticator
     @Override
     public UserIdentity login(String username, Object credentials, ServletRequest request)
     {
+        if (LOG.isDebugEnabled())
+            LOG.debug("login {} {} {}", username, credentials, request);
+
         UserIdentity user = super.login(username, credentials, request);
         if (user != null)
         {
             HttpSession session = ((HttpServletRequest)request).getSession();
             Authentication cached = new SessionAuthentication(getAuthMethod(), user, credentials);
             session.setAttribute(SessionAuthentication.__J_AUTHENTICATED, cached);
-            session.setAttribute(__USER_INFO, ((OpenIdCredentials)credentials).getUserInfo());
+            session.setAttribute(__USER_CLAIMS, ((OpenIdCredentials)credentials).getUserInfo());
+            session.setAttribute(__RESPONSE_JSON, ((OpenIdCredentials)credentials).getResponse());
         }
         return user;
     }
@@ -171,7 +184,8 @@ public class OpenIdAuthenticator extends LoginAuthenticator
 
         //clean up session
         session.removeAttribute(SessionAuthentication.__J_AUTHENTICATED);
-        session.removeAttribute(__USER_INFO);
+        session.removeAttribute(__USER_CLAIMS);
+        session.removeAttribute(__RESPONSE_JSON);
     }
 
     @Override
@@ -268,7 +282,7 @@ public class OpenIdAuthenticator extends LoginAuthenticator
                                     nuri = URIUtil.SLASH;
                             }
                         }
-                        GoogleAuthentication googleAuth = new GoogleAuthentication(getAuthMethod(), user);
+                        OpenIdAuthentication googleAuth = new OpenIdAuthentication(getAuthMethod(), user);
                         LOG.debug("authenticated {}->{}", googleAuth, nuri);
 
                         response.setContentLength(0);
@@ -407,10 +421,10 @@ public class OpenIdAuthenticator extends LoginAuthenticator
         return pathInContext != null && (pathInContext.equals(_errorPath));
     }
 
-    public String getChallengeUri(HttpSession session)
+    protected String getChallengeUri(HttpSession session)
     {
-        String antiForgeryToken;
         // TODO: is this synchronization necessary
+        String antiForgeryToken;
         synchronized (session)
         {
             antiForgeryToken = (session.getAttribute(__CSRF_TOKEN) == null)
@@ -419,10 +433,17 @@ public class OpenIdAuthenticator extends LoginAuthenticator
             session.setAttribute(__CSRF_TOKEN, antiForgeryToken);
         }
 
+        // any custom scopes requested from configuration
+        StringBuilder scopes = new StringBuilder();
+        for (String s : _configuration.getScopes())
+        {
+            scopes.append("%20" + s);
+        }
+
         return _configuration.getAuthEndpoint() +
             "?client_id=" + _configuration.getClientId() +
             "&redirect_uri=" + _configuration.getRedirectUri() +
-            "&scope=openid%20email%20profile" +
+            "&scope=openid" + scopes +
             "&state=" + antiForgeryToken +
             "&response_type=code";
     }
@@ -438,9 +459,9 @@ public class OpenIdAuthenticator extends LoginAuthenticator
      * Subsequent requests from the same user are authenticated by the presents
      * of a {@link SessionAuthentication} instance in their session.
      */
-    public static class GoogleAuthentication extends UserAuthentication implements Authentication.ResponseSent
+    public static class OpenIdAuthentication extends UserAuthentication implements Authentication.ResponseSent
     {
-        public GoogleAuthentication(String method, UserIdentity userIdentity)
+        public OpenIdAuthentication(String method, UserIdentity userIdentity)
         {
             super(method, userIdentity);
         }

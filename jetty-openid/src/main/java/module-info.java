@@ -16,9 +16,9 @@
 //  ========================================================================
 //
 
-module org.eclipse.jetty.openid
+module org.eclipse.jetty.security.openid
 {
-    exports org.eclipse.jetty.openid;
+    exports org.eclipse.jetty.security.openid;
 
     requires jetty.servlet.api;
     requires org.eclipse.jetty.server;

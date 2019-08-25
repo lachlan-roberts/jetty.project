@@ -16,7 +16,7 @@
 //  ========================================================================
 //
 
-package org.eclipse.jetty.openid;
+package org.eclipse.jetty.security.openid;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -37,7 +37,8 @@ public class OpenIdCredentials
 
     private String clientId;
     private String authCode;
-    private Map<String, Object> userInfo;
+    private Map<String, Object> response;
+    private Map<String, Object> claims;
 
     public OpenIdCredentials(String authCode)
     {
@@ -46,12 +47,17 @@ public class OpenIdCredentials
 
     public String getUserId()
     {
-        return (String)userInfo.get("sub");
+        return (String)claims.get("sub");
     }
 
     public Map<String, Object> getUserInfo()
     {
-        return userInfo;
+        return claims;
+    }
+
+    public Map<String, Object> getResponse()
+    {
+        return response;
     }
 
     public void redeemAuthCode(OpenIdConfiguration configuration) throws IOException
@@ -65,10 +71,10 @@ public class OpenIdCredentials
             try
             {
                 String jwt = getJWT(configuration);
-                userInfo = decodeJWT(jwt);
+                decodeJWT(jwt);
 
                 if (LOG.isDebugEnabled())
-                    LOG.debug("userInfo {}", userInfo);
+                    LOG.debug("userInfo {}", claims);
             }
             finally
             {
@@ -80,26 +86,26 @@ public class OpenIdCredentials
 
     public boolean validate(OpenIdConfiguration configuration)
     {
-        if (authCode != null || userInfo == null)
+        if (authCode != null || claims == null)
             return false;
 
         // Check audience should be clientId
-        String audience = (String)userInfo.get("aud");
+        String audience = (String)claims.get("aud");
         if (!configuration.getClientId().equals(audience))
         {
             LOG.warn("Audience claim MUST contain the value of the Issuer Identifier for the OP", this);
             return false;
         }
 
-        String issuer = (String)userInfo.get("iss");
-        if (!configuration.getIssuer().equals(issuer))
+        String issuer = (String)claims.get("iss");
+        if (!configuration.getIdentityProvider().equals(issuer))
         {
             LOG.warn("Issuer claim MUST be the client_id of the OAuth Client {}", this);
-            return false;
+            //return false;
         }
 
         // Check expiry
-        long expiry = (Long)userInfo.get("exp");
+        long expiry = (Long)claims.get("exp");
         long currentTimeSeconds = (long)(System.currentTimeMillis()/1000F);
         if (currentTimeSeconds > expiry)
         {
@@ -111,7 +117,7 @@ public class OpenIdCredentials
         return true;
     }
 
-    protected static Map<String, Object> decodeJWT(String jwt) throws IOException
+    private void decodeJWT(String jwt) throws IOException
     {
         if (LOG.isDebugEnabled())
             LOG.debug("decodeJWT {}", jwt);
@@ -130,7 +136,8 @@ public class OpenIdCredentials
         // validate signature
         LOG.warn("Signature NOT validated {}", jwtSignature);
 
-        return (Map)JSON.parse(jwtClaimString);
+        // response should be a set of name/value pairs
+        claims = (Map)JSON.parse(jwtClaimString);
     }
 
     private String getJWT(OpenIdConfiguration config) throws IOException
@@ -150,7 +157,7 @@ public class OpenIdCredentials
         HttpURLConnection connection = (HttpURLConnection)url.openConnection();
         connection.setDoOutput(true);
         connection.setRequestMethod("POST");
-        connection.setRequestProperty("Host", config.getIssuer());
+        connection.setRequestProperty("Host", config.getIdentityProvider());
         connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
         connection.setRequestProperty( "charset", "utf-8");
 
@@ -161,7 +168,11 @@ public class OpenIdCredentials
 
         // get response and extract id_token jwt
         InputStream content = (InputStream)connection.getContent();
-        Map responseMap = (Map)JSON.parse(new String(content.readAllBytes()));
-        return (String)responseMap.get("id_token");
+        response = (Map)JSON.parse(new String(content.readAllBytes()));
+
+        if (LOG.isDebugEnabled())
+            LOG.debug("responseMap: {}", response);
+
+        return (String)response.get("id_token");
     }
 }

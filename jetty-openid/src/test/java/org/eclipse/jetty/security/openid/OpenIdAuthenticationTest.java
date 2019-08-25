@@ -16,7 +16,7 @@
 //  ========================================================================
 //
 
-package org.eclipse.jetty.openid;
+package org.eclipse.jetty.security.openid;
 
 import java.io.IOException;
 import java.security.Principal;
@@ -81,7 +81,7 @@ public class OpenIdAuthenticationTest
             Principal userPrincipal = request.getUserPrincipal();
             if (userPrincipal != null)
             {
-                Map<String, String> userInfo = (Map)request.getSession().getAttribute(OpenIdAuthenticator.__USER_INFO);
+                Map<String, Object> userInfo = (Map)request.getSession().getAttribute(OpenIdAuthenticator.__USER_CLAIMS);
                 response.getWriter().println("<p>Welcome: " + userInfo.get("name") + "</p>");
                 response.getWriter().println("<a href=\"/profile\">Profile</a><br>");
                 response.getWriter().println("<a href=\"/admin\">Admin</a><br>");
@@ -100,7 +100,7 @@ public class OpenIdAuthenticationTest
         protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException
         {
             response.setContentType(MimeTypes.Type.TEXT_HTML.asString());
-            Map<String, String> userInfo = (Map)request.getSession().getAttribute(OpenIdAuthenticator.__USER_INFO);
+            Map<String, Object> userInfo = (Map)request.getSession().getAttribute(OpenIdAuthenticator.__USER_CLAIMS);
 
             response.getWriter().println("<!-- Add icon library -->\n" +
                 "<div class=\"card\">\n" +
@@ -142,12 +142,12 @@ public class OpenIdAuthenticationTest
 
         // configure security constraints
         Constraint constraint = new Constraint();
-        constraint.setName(Constraint.__GOOGLE_AUTH);
+        constraint.setName(Constraint.__OPENID_AUTH);
         constraint.setRoles(new String[]{"**"});
         constraint.setAuthenticate(true);
 
         Constraint adminConstraint = new Constraint();
-        adminConstraint.setName(Constraint.__GOOGLE_AUTH);
+        adminConstraint.setName(Constraint.__OPENID_AUTH);
         adminConstraint.setRoles(new String[]{"admin"});
         adminConstraint.setAuthenticate(true);
 
@@ -164,7 +164,7 @@ public class OpenIdAuthenticationTest
 
         // security handler
         ConstraintSecurityHandler securityHandler = new ConstraintSecurityHandler();
-        securityHandler.setRealmName("GoogleAuthentication");
+        securityHandler.setRealmName("OpenID Connect Authentication");
         securityHandler.addConstraintMapping(profileMapping);
         securityHandler.addConstraintMapping(loginMapping);
         securityHandler.addConstraintMapping(adminMapping);
@@ -183,14 +183,26 @@ public class OpenIdAuthenticationTest
             "1051168419525-5nl60mkugb77p9j194mrh287p1e0ahfi.apps.googleusercontent.com",
             "XT_MIsSv_aUCGollauCaJY8S",
             redirectUri);
-         */
+        configuration.addScopes("email", "profile");
+        */
 
+        /*
         // Microsoft Authentication
         OpenIdConfiguration configuration = new OpenIdConfiguration(
             "https://login.microsoftonline.com/common/v2.0",
             "5f05dea8-2bd9-45de-b30f-cf5c102b8784",
             "IfhQJKi-5[vxhh_=ldqt0y4PkV3z_1ca",
             redirectUri);
+        */
+
+
+        // Yahoo Authentication
+        OpenIdConfiguration configuration = new OpenIdConfiguration(
+            "https://login.yahoo.com",
+            "dj0yJmk9ME5Id05yTkdGNDdPJmQ9WVdrOU9VcHVZWEp4TkdrbWNHbzlNQS0tJnM9Y29uc3VtZXJzZWNyZXQmc3Y9MCZ4PTE2",
+            "1e7f0eeb0ba0af9d9198f9be760f66ae3ea9e3b5",
+            redirectUri);
+        configuration.addScopes("sdps-r");
 
         // configure loginservice with user store
         OpenIdLoginService loginService = new OpenIdLoginService(configuration);//, hashLoginService);
@@ -202,13 +214,5 @@ public class OpenIdAuthenticationTest
 
         server.start();
         server.join();
-    }
-
-    @Test
-    public void decodeJwt() throws Exception
-    {
-        String jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
-
-        OpenIdCredentials.decodeJWT(jwt);
     }
 }

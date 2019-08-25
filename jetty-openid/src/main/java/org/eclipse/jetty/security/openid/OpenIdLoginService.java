@@ -16,7 +16,7 @@
 //  ========================================================================
 //
 
-package org.eclipse.jetty.openid;
+package org.eclipse.jetty.security.openid;
 
 import java.io.IOException;
 import java.security.Principal;
@@ -53,7 +53,12 @@ public class OpenIdLoginService extends ContainerLifeCycle implements LoginServi
     @Override
     public String getName()
     {
-        return this.getClass().getSimpleName();
+        return _configuration.getIdentityProvider();
+    }
+
+    public OpenIdConfiguration getConfiguration()
+    {
+        return _configuration;
     }
 
     @Override
@@ -66,7 +71,8 @@ public class OpenIdLoginService extends ContainerLifeCycle implements LoginServi
         try
         {
             openIdCredentials.redeemAuthCode(_configuration);
-            // TODO: validate?
+            if (!openIdCredentials.validate(_configuration))
+                return null;
         }
         catch (IOException e)
         {

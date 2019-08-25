@@ -9,3 +9,6 @@ security
 [lib]
 lib/jetty-openid-${jetty.version}.jar
 lib/jetty-util-ajax-${jetty.version}.jar
+
+[xml]
+etc/jetty-openid.xml
