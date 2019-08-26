@@ -19,7 +19,6 @@
 package org.eclipse.jetty.requestlog.jmh;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
@@ -72,7 +71,6 @@ public class CustomLookupRequestLog extends ContainerLifeCycle implements Reques
         addBean(_requestLogWriter);
 
         _tokens = getTokens(formatString);
-        Collections.reverse(_tokens);
     }
 
     public CustomLookupRequestLog(String file)

@@ -22,7 +22,6 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
@@ -207,12 +206,8 @@ public class CustomListRequestLog extends ContainerLifeCycle implements RequestL
         MethodHandles.Lookup lookup = MethodHandles.lookup();
         MethodHandle append = lookup.findStatic(CustomListRequestLog.class, "append", methodType(Void.TYPE, String.class, StringBuilder.class));
 
-        List<Token> tokens = getTokens(formatString);
-        Collections.reverse(tokens);
-
-
         List<MethodHandle> methodHandles = new ArrayList<>();
-        for (Token t : tokens)
+        for (Token t : getTokens(formatString))
         {
             if (t.isLiteralString())
                 updateLogHandle(methodHandles, append, t.literal);

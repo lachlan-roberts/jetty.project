@@ -134,7 +134,8 @@ public class CustomRequestLogBenchmark
         for (ReqResp rr : requests)
         {
             requestLog.log(rr.request, rr.response);
-            count += logWriter.getNextLog().length();
+            String log = logWriter.getNextLog();
+            count += log.length();
         }
         return count;
     }
@@ -143,8 +144,8 @@ public class CustomRequestLogBenchmark
     {
         Options opt = new OptionsBuilder()
                 .include(CustomRequestLogBenchmark.class.getSimpleName())
-                .warmupIterations(30)
-                .measurementIterations(20)
+                .warmupIterations(10)
+                .measurementIterations(15)
                 .forks(1)
                 .threads(1)
                 .build();
