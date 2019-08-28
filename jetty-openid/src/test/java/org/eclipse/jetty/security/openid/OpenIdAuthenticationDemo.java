@@ -29,19 +29,12 @@ import org.eclipse.jetty.http.MimeTypes;
 import org.eclipse.jetty.security.Authenticator;
 import org.eclipse.jetty.security.ConstraintMapping;
 import org.eclipse.jetty.security.ConstraintSecurityHandler;
-import org.eclipse.jetty.security.HashLoginService;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.toolchain.test.MavenTestingUtils;
-import org.eclipse.jetty.util.log.Log;
-import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.util.security.Constraint;
-import org.junit.jupiter.api.Test;
 
-public class OpenIdAuthenticationTest
+public class OpenIdAuthenticationDemo
 {
-    private static final Logger LOG = Log.getLogger(OpenIdAuthenticationTest.class);
-
     public static class AdminPage extends HttpServlet
     {
         @Override
@@ -126,8 +119,7 @@ public class OpenIdAuthenticationTest
         }
     }
 
-    @Test
-    public void runAuthenticationDemo() throws Exception
+    public static void main(String[] args) throws Exception
     {
         Server server = new Server(8080);
         ServletContextHandler context = new ServletContextHandler(server, "/", ServletContextHandler.SESSIONS);
@@ -169,37 +161,49 @@ public class OpenIdAuthenticationTest
         securityHandler.addConstraintMapping(loginMapping);
         securityHandler.addConstraintMapping(adminMapping);
 
-        HashLoginService hashLoginService = new HashLoginService();
-        hashLoginService.setConfig(MavenTestingUtils.getTestResourceFile("realm.properties").getAbsolutePath());
-        hashLoginService.setHotReload(true);
 
-        /*
         // Google Authentication
         OpenIdConfiguration configuration = new OpenIdConfiguration(
             "https://accounts.google.com/",
             "1051168419525-5nl60mkugb77p9j194mrh287p1e0ahfi.apps.googleusercontent.com",
-            "XT_MIsSv_aUCGollauCaJY8S",
-            redirectUri);
+            "XT_MIsSv_aUCGollauCaJY8S");
         configuration.addScopes("email", "profile");
-        */
 
         /*
         // Microsoft Authentication
         OpenIdConfiguration configuration = new OpenIdConfiguration(
             "https://login.microsoftonline.com/common/v2.0",
             "5f05dea8-2bd9-45de-b30f-cf5c102b8784",
-            "IfhQJKi-5[vxhh_=ldqt0y4PkV3z_1ca",
-            redirectUri);
+            "IfhQJKi-5[vxhh_=ldqt0y4PkV3z_1ca");
         */
-        
+
+        /*
         // Yahoo Authentication
         OpenIdConfiguration configuration = new OpenIdConfiguration(
             "https://login.yahoo.com",
             "dj0yJmk9ME5Id05yTkdGNDdPJmQ9WVdrOU9VcHVZWEp4TkdrbWNHbzlNQS0tJnM9Y29uc3VtZXJzZWNyZXQmc3Y9MCZ4PTE2",
             "1e7f0eeb0ba0af9d9198f9be760f66ae3ea9e3b5");
         configuration.addScopes("sdps-r");
+        */
 
-        // configure loginservice with user store
+        /*
+        // Create a realm.properties file to associate roles with users
+        Path tmpDir = Paths.get(System.getProperty("java.io.tmpdir"));
+        Path tmpPath = Files.createTempFile(tmpDir, "realm", ".properties");
+        tmpPath.toFile().deleteOnExit();
+        try (BufferedWriter writer = Files.newBufferedWriter(tmpPath, StandardCharsets.UTF_8, StandardOpenOption.WRITE))
+        {
+            // <userId>:[,<rolename> ...]
+            writer.write("114260987481616800581:,admin");
+        }
+
+        // This must be added to the OpenIdLoginService in constructor below
+        HashLoginService hashLoginService = new HashLoginService();
+        hashLoginService.setConfig(tmpPath.toAbsolutePath().toString());
+        hashLoginService.setHotReload(true);
+         */
+
+        // Configure OpenIdLoginService optionally providing a base LoginService to provide user roles
         OpenIdLoginService loginService = new OpenIdLoginService(configuration);//, hashLoginService);
         securityHandler.setLoginService(loginService);
 

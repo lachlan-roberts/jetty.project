@@ -68,7 +68,7 @@ public class DefaultAuthenticatorFactory implements Authenticator.Factory
             authenticator = new ConfigurableSpnegoAuthenticator();
         else if (Constraint.__NEGOTIATE_AUTH.equalsIgnoreCase(auth)) // see Bug #377076
             authenticator = new ConfigurableSpnegoAuthenticator(Constraint.__NEGOTIATE_AUTH);
-        else if (Constraint.__CERT_AUTH.equalsIgnoreCase(auth) || Constraint.__CERT_AUTH2.equalsIgnoreCase(auth))
+        if (Constraint.__CERT_AUTH.equalsIgnoreCase(auth) || Constraint.__CERT_AUTH2.equalsIgnoreCase(auth))
             authenticator = new ClientCertAuthenticator();
 
         return authenticator;

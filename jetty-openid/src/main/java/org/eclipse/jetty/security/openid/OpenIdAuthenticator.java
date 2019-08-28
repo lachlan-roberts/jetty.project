@@ -63,10 +63,6 @@ public class OpenIdAuthenticator extends LoginAuthenticator
 
     public static final String __USER_CLAIMS = "org.eclipse.jetty.security.openid.user_claims";
     public static final String __RESPONSE_JSON = "org.eclipse.jetty.security.openid.response";
-
-    public static final String __IDENTITY_PROVIDER = "org.eclipse.jetty.security.openid.identity_provider";
-    public static final String __CLIENT_ID = "org.eclipse.jetty.security.openid.client_id";
-    public static final String __REDIRECT_URI = "org.eclipse.jetty.security.openid.redirect_uri";
     public static final String __ERROR_PAGE = "org.eclipse.jetty.security.openid.error_page";
     public static final String __J_URI = "org.eclipse.jetty.security.openid.URI";
     public static final String __J_POST = "org.eclipse.jetty.security.openid.POST";
@@ -282,19 +278,19 @@ public class OpenIdAuthenticator extends LoginAuthenticator
                                     nuri = URIUtil.SLASH;
                             }
                         }
-                        OpenIdAuthentication googleAuth = new OpenIdAuthentication(getAuthMethod(), user);
-                        LOG.debug("authenticated {}->{}", googleAuth, nuri);
+                        OpenIdAuthentication openIdAuth = new OpenIdAuthentication(getAuthMethod(), user);
+                        LOG.debug("authenticated {}->{}", openIdAuth, nuri);
 
                         response.setContentLength(0);
                         int redirectCode = (baseRequest.getHttpVersion().getVersion() < HttpVersion.HTTP_1_1.getVersion() ? HttpServletResponse.SC_MOVED_TEMPORARILY : HttpServletResponse.SC_SEE_OTHER);
                         baseResponse.sendRedirect(redirectCode, response.encodeRedirectURL(nuri));
-                        return googleAuth;
+                        return openIdAuth;
                     }
                 }
 
                 // not authenticated
                 if (LOG.isDebugEnabled())
-                    LOG.debug("Google authentication FAILED");
+                    LOG.debug("OpenId authentication FAILED");
                 if (_errorPage == null)
                 {
                     if (LOG.isDebugEnabled())
@@ -421,7 +417,7 @@ public class OpenIdAuthenticator extends LoginAuthenticator
         return pathInContext != null && (pathInContext.equals(_errorPath));
     }
 
-    protected String getRedirectUri(HttpServletRequest request)
+    private String getRedirectUri(HttpServletRequest request)
     {
         final StringBuffer redirectUri = new StringBuffer(128);
         URIUtil.appendSchemeHostPort(redirectUri, request.getScheme(),
@@ -435,7 +431,6 @@ public class OpenIdAuthenticator extends LoginAuthenticator
     {
         HttpSession session = request.getSession();
         String antiForgeryToken;
-        // TODO: is this synchronization necessary
         synchronized (session)
         {
             antiForgeryToken = (session.getAttribute(__CSRF_TOKEN) == null)
@@ -466,7 +461,7 @@ public class OpenIdAuthenticator extends LoginAuthenticator
     }
 
     /**
-     * This Authentication represents a just completed Google authentication.
+     * This Authentication represents a just completed OpenId Connect authentication.
      * Subsequent requests from the same user are authenticated by the presents
      * of a {@link SessionAuthentication} instance in their session.
      */
@@ -480,7 +475,7 @@ public class OpenIdAuthenticator extends LoginAuthenticator
         @Override
         public String toString()
         {
-            return "Google" + super.toString();
+            return "OpenId" + super.toString();
         }
     }
 }
