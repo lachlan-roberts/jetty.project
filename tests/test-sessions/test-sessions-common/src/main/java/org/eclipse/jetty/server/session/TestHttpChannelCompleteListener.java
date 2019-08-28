@@ -21,20 +21,12 @@ package org.eclipse.jetty.server.session;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.eclipse.jetty.server.handler.ContextHandler.Context;
-import org.eclipse.jetty.server.handler.ContextHandler.ContextScopeListener;
+import org.eclipse.jetty.server.HttpChannel.Listener;
+import org.eclipse.jetty.server.Request;
 
-public class TestContextScopeListener implements ContextScopeListener
+public class TestHttpChannelCompleteListener implements Listener
 {
-    AtomicReference<CountDownLatch> _exitSynchronizer = new AtomicReference<>();
-
-    /**
-     * @return the exitSynchronizer
-     */
-    public CountDownLatch getExitSynchronizer()
-    {
-        return _exitSynchronizer.get();
-    }
+    private final AtomicReference<CountDownLatch> _exitSynchronizer = new AtomicReference<>();
 
     /**
      * @param exitSynchronizer the exitSynchronizer to set
@@ -45,13 +37,7 @@ public class TestContextScopeListener implements ContextScopeListener
     }
 
     @Override
-    public void enterScope(Context context, org.eclipse.jetty.server.Request request, Object reason)
-    {
-        //noop
-    }
-
-    @Override
-    public void exitScope(Context context, org.eclipse.jetty.server.Request request)
+    public void onComplete(Request request)
     {
         if (_exitSynchronizer.get() != null)
             _exitSynchronizer.get().countDown();

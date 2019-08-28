@@ -47,8 +47,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 public class HttpDestinationOverHTTPTest extends AbstractHttpClientServerTest
 {
@@ -260,28 +260,27 @@ public class HttpDestinationOverHTTPTest extends AbstractHttpClientServerTest
 
         String host = "localhost";
         int port = connector.getLocalPort();
-        Destination destinationBefore = client.getDestination(scenario.getScheme(), host, port);
-
-        ContentResponse response = client.newRequest(host, port)
-            .scheme(scenario.getScheme())
-            .header(HttpHeader.CONNECTION, HttpHeaderValue.CLOSE.asString())
-            .send();
+        Request request = client.newRequest(host, port)
+                .scheme(scenario.getScheme())
+                .header(HttpHeader.CONNECTION, HttpHeaderValue.CLOSE.asString());
+        Destination destinationBefore = client.resolveDestination(request);
+        ContentResponse response = request.send();
 
         assertEquals(200, response.getStatus());
 
-        Destination destinationAfter = client.getDestination(scenario.getScheme(), host, port);
+        Destination destinationAfter = client.resolveDestination(request);
         assertSame(destinationBefore, destinationAfter);
 
         client.setRemoveIdleDestinations(true);
 
-        response = client.newRequest(host, port)
+        request = client.newRequest(host, port)
             .scheme(scenario.getScheme())
-            .header(HttpHeader.CONNECTION, HttpHeaderValue.CLOSE.asString())
-            .send();
+            .header(HttpHeader.CONNECTION, HttpHeaderValue.CLOSE.asString());
+        response = request.send();
 
         assertEquals(200, response.getStatus());
 
-        destinationAfter = client.getDestination(scenario.getScheme(), host, port);
+        destinationAfter = client.resolveDestination(request);
         assertNotSame(destinationBefore, destinationAfter);
     }
 
@@ -298,14 +297,7 @@ public class HttpDestinationOverHTTPTest extends AbstractHttpClientServerTest
 
         server.stop();
         Request request = client.newRequest(host, port).scheme(scenario.getScheme());
-        try
-        {
-            request.send();
-            fail("Request to a closed port must fail");
-        }
-        catch (Exception expected)
-        {
-        }
+        assertThrows(Exception.class, () ->  request.send());
 
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
         while (!client.getDestinations().isEmpty() && System.nanoTime() < deadline)
