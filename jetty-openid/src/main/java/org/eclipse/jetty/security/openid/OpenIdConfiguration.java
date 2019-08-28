@@ -18,7 +18,6 @@
 
 package org.eclipse.jetty.security.openid;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
@@ -34,55 +33,48 @@ public class OpenIdConfiguration
     private final String identityProvider;
     private final String authEndpoint;
     private final String tokenEndpoint;
-    private final String userInfoEndpoint;
-    private final String jwksUri;
     private final String clientId;
     private final String clientSecret;
-    private final String redirectUri;
+    private final Map<String, Object> discoveryDocument;
 
     private List<String> scopes = new ArrayList<>();
 
-    public OpenIdConfiguration(String provider, String clientId, String clientSecret, String redirectUri)
+    public OpenIdConfiguration(String provider, String clientId, String clientSecret)
     {
         this.identityProvider = provider;
         this.clientId = clientId;
         this.clientSecret = clientSecret;
-        this.redirectUri = redirectUri;
 
-        Map discoveryDocument;
         try
         {
             if (provider.endsWith("/"))
-                provider = provider.substring(0, provider.length()-1);
+                provider = provider.substring(0, provider.length() - 1);
 
             URI providerUri = URI.create(provider + CONFIG_PATH);
             InputStream inputStream = providerUri.toURL().openConnection().getInputStream();
             String content = new String(inputStream.readAllBytes());
             discoveryDocument = (Map)JSON.parse(content);
         }
-        catch (IOException e)
+        catch (Throwable e)
         {
             throw new IllegalArgumentException("invalid identity provider", e);
         }
 
-        String issuer = (String)discoveryDocument.get("issuer");
-        // todo: if (!identityProvider.equals(issuer))
+        if (discoveryDocument.get("issuer") == null)
+            throw new IllegalArgumentException();
 
         authEndpoint = (String)discoveryDocument.get("authorization_endpoint");
         if (authEndpoint == null)
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("authorization_endpoint");
 
         tokenEndpoint = (String)discoveryDocument.get("token_endpoint");
         if (tokenEndpoint == null)
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("token_endpoint");
+    }
 
-        userInfoEndpoint = (String)discoveryDocument.get("userinfo_endpoint");
-        if (userInfoEndpoint == null)
-            throw new IllegalArgumentException();
-
-        jwksUri = (String)discoveryDocument.get("jwks_uri");
-        if (jwksUri == null)
-            throw new IllegalArgumentException();
+    public Map<String, Object> getDiscoveryDocument()
+    {
+        return discoveryDocument;
     }
 
     public String getAuthEndpoint()
@@ -105,24 +97,9 @@ public class OpenIdConfiguration
         return identityProvider;
     }
 
-    public String getJwksUri()
-    {
-        return jwksUri;
-    }
-
-    public String getRedirectUri()
-    {
-        return redirectUri;
-    }
-
     public String getTokenEndpoint()
     {
         return tokenEndpoint;
-    }
-
-    public String getUserInfoEndpoint()
-    {
-        return userInfoEndpoint;
     }
 
     public void addScopes(String... scopes)
@@ -131,11 +108,6 @@ public class OpenIdConfiguration
         {
             this.scopes.add(scope);
         }
-    }
-
-    public void addScope(String scope)
-    {
-        this.scopes.add(scope);
     }
 
     public List<String> getScopes()

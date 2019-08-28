@@ -173,9 +173,6 @@ public class OpenIdAuthenticationTest
         hashLoginService.setConfig(MavenTestingUtils.getTestResourceFile("realm.properties").getAbsolutePath());
         hashLoginService.setHotReload(true);
 
-
-        final String redirectUri = "http://localhost:8080/j_security_check";
-
         /*
         // Google Authentication
         OpenIdConfiguration configuration = new OpenIdConfiguration(
@@ -194,14 +191,12 @@ public class OpenIdAuthenticationTest
             "IfhQJKi-5[vxhh_=ldqt0y4PkV3z_1ca",
             redirectUri);
         */
-
-
+        
         // Yahoo Authentication
         OpenIdConfiguration configuration = new OpenIdConfiguration(
             "https://login.yahoo.com",
             "dj0yJmk9ME5Id05yTkdGNDdPJmQ9WVdrOU9VcHVZWEp4TkdrbWNHbzlNQS0tJnM9Y29uc3VtZXJzZWNyZXQmc3Y9MCZ4PTE2",
-            "1e7f0eeb0ba0af9d9198f9be760f66ae3ea9e3b5",
-            redirectUri);
+            "1e7f0eeb0ba0af9d9198f9be760f66ae3ea9e3b5");
         configuration.addScopes("sdps-r");
 
         // configure loginservice with user store

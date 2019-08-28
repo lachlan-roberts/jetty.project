@@ -166,7 +166,7 @@ public class OpenIdAuthenticator extends LoginAuthenticator
             HttpSession session = ((HttpServletRequest)request).getSession();
             Authentication cached = new SessionAuthentication(getAuthMethod(), user, credentials);
             session.setAttribute(SessionAuthentication.__J_AUTHENTICATED, cached);
-            session.setAttribute(__USER_CLAIMS, ((OpenIdCredentials)credentials).getUserInfo());
+            session.setAttribute(__USER_CLAIMS, ((OpenIdCredentials)credentials).getClaims());
             session.setAttribute(__RESPONSE_JSON, ((OpenIdCredentials)credentials).getResponse());
         }
         return user;
@@ -264,7 +264,7 @@ public class OpenIdAuthenticator extends LoginAuthenticator
                     }
 
                     // Attempt to login with the provided authCode
-                    OpenIdCredentials credentials = new OpenIdCredentials(authCode);
+                    OpenIdCredentials credentials = new OpenIdCredentials(authCode, getRedirectUri(request), _configuration);
                     UserIdentity user = login(null, credentials, request);
                     HttpSession session = request.getSession(false);
                     if (user != null)
@@ -390,7 +390,7 @@ public class OpenIdAuthenticator extends LoginAuthenticator
             }
 
             // send the the challenge
-            String challengeUri = getChallengeUri(session);
+            String challengeUri = getChallengeUri(request);
             LOG.debug("challenge {}->{}", session.getId(), challengeUri);
             int redirectCode = (baseRequest.getHttpVersion().getVersion() < HttpVersion.HTTP_1_1.getVersion() ? HttpServletResponse.SC_MOVED_TEMPORARILY : HttpServletResponse.SC_SEE_OTHER);
             baseResponse.sendRedirect(redirectCode, response.encodeRedirectURL(challengeUri));
@@ -421,10 +421,21 @@ public class OpenIdAuthenticator extends LoginAuthenticator
         return pathInContext != null && (pathInContext.equals(_errorPath));
     }
 
-    protected String getChallengeUri(HttpSession session)
+    protected String getRedirectUri(HttpServletRequest request)
     {
-        // TODO: is this synchronization necessary
+        final StringBuffer redirectUri = new StringBuffer(128);
+        URIUtil.appendSchemeHostPort(redirectUri, request.getScheme(),
+            request.getServerName(), request.getServerPort());
+        redirectUri.append(request.getContextPath());
+        redirectUri.append(__J_SECURITY_CHECK);
+        return redirectUri.toString();
+    }
+
+    protected String getChallengeUri(HttpServletRequest request)
+    {
+        HttpSession session = request.getSession();
         String antiForgeryToken;
+        // TODO: is this synchronization necessary
         synchronized (session)
         {
             antiForgeryToken = (session.getAttribute(__CSRF_TOKEN) == null)
@@ -442,7 +453,7 @@ public class OpenIdAuthenticator extends LoginAuthenticator
 
         return _configuration.getAuthEndpoint() +
             "?client_id=" + _configuration.getClientId() +
-            "&redirect_uri=" + _configuration.getRedirectUri() +
+            "&redirect_uri=" + getRedirectUri(request) +
             "&scope=openid" + scopes +
             "&state=" + antiForgeryToken +
             "&response_type=code";

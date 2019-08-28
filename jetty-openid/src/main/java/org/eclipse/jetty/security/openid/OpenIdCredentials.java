@@ -35,14 +35,17 @@ public class OpenIdCredentials
 {
     private static final Logger LOG = Log.getLogger(OpenIdCredentials.class);
 
-    private String clientId;
+    private final String redirectUri;
+    private final OpenIdConfiguration configuration;
     private String authCode;
     private Map<String, Object> response;
     private Map<String, Object> claims;
 
-    public OpenIdCredentials(String authCode)
+    public OpenIdCredentials(String authCode, String redirectUri, OpenIdConfiguration configuration)
     {
         this.authCode = authCode;
+        this.redirectUri = redirectUri;
+        this.configuration = configuration;
     }
 
     public String getUserId()
@@ -50,7 +53,7 @@ public class OpenIdCredentials
         return (String)claims.get("sub");
     }
 
-    public Map<String, Object> getUserInfo()
+    public Map<String, Object> getClaims()
     {
         return claims;
     }
@@ -60,17 +63,16 @@ public class OpenIdCredentials
         return response;
     }
 
-    public void redeemAuthCode(OpenIdConfiguration configuration) throws IOException
+    public void redeemAuthCode() throws IOException
     {
         if (LOG.isDebugEnabled())
             LOG.debug("redeemAuthCode() {}", this);
 
-        this.clientId = configuration.getClientId();
         if (authCode != null)
         {
             try
             {
-                String jwt = getJWT(configuration);
+                String jwt = getJWT();
                 decodeJWT(jwt);
 
                 if (LOG.isDebugEnabled())
@@ -84,21 +86,21 @@ public class OpenIdCredentials
         }
     }
 
-    public boolean validate(OpenIdConfiguration configuration)
+    public boolean validate()
     {
-        if (authCode != null || claims == null)
+        if (authCode != null)
             return false;
 
         // Check audience should be clientId
         String audience = (String)claims.get("aud");
-        if (!configuration.getClientId().equals(audience))
+        if (!configuration.getIdentityProvider().equals(audience))
         {
             LOG.warn("Audience claim MUST contain the value of the Issuer Identifier for the OP", this);
-            return false;
+            //return false;
         }
 
         String issuer = (String)claims.get("iss");
-        if (!configuration.getIdentityProvider().equals(issuer))
+        if (!configuration.getClientId().equals(issuer))
         {
             LOG.warn("Issuer claim MUST be the client_id of the OAuth Client {}", this);
             //return false;
@@ -106,7 +108,7 @@ public class OpenIdCredentials
 
         // Check expiry
         long expiry = (Long)claims.get("exp");
-        long currentTimeSeconds = (long)(System.currentTimeMillis()/1000F);
+        long currentTimeSeconds = (long)(System.currentTimeMillis() / 1000F);
         if (currentTimeSeconds > expiry)
         {
             if (LOG.isDebugEnabled())
@@ -140,28 +142,28 @@ public class OpenIdCredentials
         claims = (Map)JSON.parse(jwtClaimString);
     }
 
-    private String getJWT(OpenIdConfiguration config) throws IOException
+    private String getJWT() throws IOException
     {
         if (LOG.isDebugEnabled())
             LOG.debug("getJWT {}", authCode);
 
         // Use the auth code to get the id_token from the OpenID Provider
         String urlParameters = "code=" + authCode +
-            "&client_id=" + clientId +
-            "&client_secret=" + config.getClientSecret() +
-            "&redirect_uri=" + config.getRedirectUri() +
+            "&client_id=" + configuration.getClientId() +
+            "&client_secret=" + configuration.getClientSecret() +
+            "&redirect_uri=" + redirectUri +
             "&grant_type=authorization_code";
 
         byte[] payload = urlParameters.getBytes(StandardCharsets.UTF_8);
-        URL url = new URL(config.getTokenEndpoint());
+        URL url = new URL(configuration.getTokenEndpoint());
         HttpURLConnection connection = (HttpURLConnection)url.openConnection();
         connection.setDoOutput(true);
         connection.setRequestMethod("POST");
-        connection.setRequestProperty("Host", config.getIdentityProvider());
+        connection.setRequestProperty("Host", configuration.getIdentityProvider());
         connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-        connection.setRequestProperty( "charset", "utf-8");
+        connection.setRequestProperty("charset", "utf-8");
 
-        try(DataOutputStream wr = new DataOutputStream(connection.getOutputStream()))
+        try (DataOutputStream wr = new DataOutputStream(connection.getOutputStream()))
         {
             wr.write(payload);
         }
